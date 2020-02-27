@@ -28,8 +28,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   if (args[0] == SYS_EXIT) {
       f->eax = args[1];
-      printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
-      thread_exit ();
+      // printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
+      thread_exit();
   }
   else if (args[0] == SYS_HALT) {
       shutdown();

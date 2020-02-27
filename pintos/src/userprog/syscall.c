@@ -26,10 +26,16 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   /* printf("System call number: %d\n", args[0]); */
 
-  if (args[0] == SYS_EXIT)
-    {
+  if (args[0] == SYS_EXIT) {
       f->eax = args[1];
       printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_exit ();
-    }
+  }
+  else if (args[0] == SYS_HALT) {
+      shutdown();
+  } else if (args[0] == SYS_WAIT) {
+    // TODO
+  } else if (args[0] == SYS_EXEC) {
+    // TODO
+  }
 }

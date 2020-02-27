@@ -56,9 +56,9 @@ struct child_status *self_status; /*The wait_status of this process (this proces
 struct list children_status; /*List of children as child_status's*/
 
 /*Explained in Algorithms*/
-void process_wait(tid_t child_tid) {...}
-/*Explained in Algorithms*/
-void process_exit(void) {...}
+void process_wait(tid_t child_tid) {...};
+void process_exit(void) {...};
+typedef pid_t tid_t;
 ```
 
 ### Algorithms:
@@ -72,7 +72,7 @@ To check for invalid pointers, we will use the following functions:
 #### `thread.h`
 As detailed in Data Structures and Functions, we will need to add the `child_status` struct along with 2 fields and 2 functions to `thread.h`.  The child is free to die upon exit while the parent is tied up, since if the parent is still waiting for an exit code, it is available to them via the struct. Conversely, if the parent exits early, the child will still finish as expected.
 
-The `child_status` struct itself will be created by the parent and passed to the child via pointer.
+The `child_status` struct itself will be created by the parent and passed to the child via pointer. `wait` and `exit` will make their respective syscalls. We also typedef pid_t to tid_t to enforce the one-to-one mapping of processes to threads that is specified in our Pintos spec.
 
 ### Synchronization:
 Since we are creating a struct to communicate between parent and child, we need to ensure that the second one to leave will free up the memory used by the struct. This is achieved by having a ref_count that has an accompanying lock to prevent concurrent modification bugs. Thus, if a child or parent sees that by decrementing ref_count, the count would reach zero, it frees the memory. This setup is insensitive to the order in which the child and parent die, since the ref_count ensures that whoever dies second cleans up the mess.

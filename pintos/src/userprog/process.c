@@ -57,17 +57,78 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  char *saveptr;
+  char *token = strtok_r(file_name, " ", &saveptr);
+
+  int num_args = 200;
+  char *args[num_args];
+  int index = 0;
+
+  while (token) {
+    args[index] = token;
+    token = strtok_r(NULL, " ", &saveptr);
+    index++;
+    if (index == num_args && token != NULL) {
+      printf("Too many arguments");
+      thread_exit();
+    }
+  }
+  
+  int argc = index;
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (args[0], &if_.eip, &if_.esp);
+
+  /* push args strings onto stack */
+  int arg_len;
+  int arg_addrs[argc];
+  for (int i = 0; i < argc ; i++) {
+    arg_len = strlen(args[i]) + 1;
+    if_.esp -= arg_len;
+    arg_addrs[i] = (int) if_.esp;
+    memcpy(if_.esp, (void *) args[i], arg_len);
+  }
+
+  /* word-align */
+  int stack_align = ((int) if_.esp) & 0xF; // get last half-byte (align stack to a 16 bit boundary) 
+  int stack_align2 = (4 * argc + 4 + 4) & 0xF; // get last half-byte (for additional aligning)
+  int zero = 0;
+  for (int i = 0; i < stack_align; i++) { // fill with zeroes up to boundary
+    if_.esp -= 1;
+    memcpy(if_.esp, &zero, 1);
+  }
+  for (int i = 0; i < 16 - stack_align2; i++) { // fill with zeroes for additional aligning
+    if_.esp -= 1;
+    memcpy(if_.esp, &zero, 1);
+  }
+
+  if_.esp -= 4; // ensure argv[argc] is NULL
+  memcpy(if_.esp, &zero, 4);
+
+  for (int i = argc - 1; i > -1; i--) { // push arg addresses in reverse order
+    if_.esp -= 4;
+    memcpy(if_.esp, (void *) arg_addrs[i], 4);
+  }
+
+  int argv = (int) if_.esp; // push address of argv
+  if_.esp -= 4;
+  memcpy(if_.esp, &argv, 4);
+
+  if_.esp -=4; // push argc
+  memcpy(if_.esp, &argc, 4);
+
+  if_.esp -= 4; // push null ptr for return address
+  memcpy(if_.esp, &zero, 4);
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  palloc_free_page (args[0]);
   if (!success)
     thread_exit ();
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in

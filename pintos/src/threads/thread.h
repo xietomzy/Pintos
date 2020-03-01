@@ -142,4 +142,18 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+/* Child status struct */
+struct child_status {
+    struct semaphore load;      /*Inform parent process when child has loaded*/
+    bool successful_load;       /*Whether the child loaded properly*/
+    struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
+    struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
+    int ref_cnt;                /*0 = both parent and child dead | 1 = one alive, one dead | 2 = both alive*/
+    tid_t childTid;             /*Child thread ID*/
+    int exit_code;              /*Child exit code*/
+    struct semaphore finished; /*0 = child running, 1 = child finished*/
+}
+struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
+struct list children_status;      /* List of children as statuses */
+
 #endif /* threads/thread.h */

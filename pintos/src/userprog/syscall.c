@@ -156,6 +156,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (args[0] == SYS_HALT) {
     shutdown_power_off();
   }
-
-  
+  if (args[0] == SYS_WAIT) {
+    // TODO
+  }
+  if (args[0] == SYS_EXEC) {
+    // TODO
+  }
 }

@@ -78,7 +78,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_FILESIZE) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin (&t->fileDescriptorList);
-    for (int i = 0; i < args[1]; i++) {
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
       e = list_next(e);
     }
     struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
@@ -88,8 +89,12 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_READ) {
     if (validate(t->pagedir, args[2])) {
       lock_acquire(&globalFileLock);
+      int fd = args[1];
+      if (fd == 0) {
+          //input_getc()
+      }
       struct list_elem *e = list_begin(&t->fileDescriptorList);
-      for (int i = 0; i < args[1]; i++) {
+      for (int i = 2; i < fd; i++) {
         e = list_next(e);
       }
       struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
@@ -100,19 +105,25 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_WRITE) {
     //if (validate(t->pagedir, args[2])) {
       lock_acquire(&globalFileLock);
-      struct list_elem *e = list_begin(&t->fileDescriptorList);
-      for (int i = 0; i < args[1]; i++) {
-        e = list_next(e);
+      int fd = args[1];
+      if (fd == 1) {
+        putbuf(args[2], args[3]);
+      } else {
+        struct list_elem *e = list_begin(&t->fileDescriptorList);
+        for (int i = 2; i < fd; i++) {
+          e = list_next(e);
+        }
+        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+        off_t size = file_write(fileD->fileptr, args[2], args[3]);
+        f->eax = size;
       }
-      struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-      off_t size = file_write(fileD->fileptr, args[2], args[3]);
-      f->eax = size;
       lock_release(&globalFileLock);
     //}
   } else if (args[0] == SYS_SEEK) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin(&t->fileDescriptorList);
-    for (int i = 0; i < args[1]; i++) {
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
       e = list_next(e);
     }
     struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
@@ -121,7 +132,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_TELL) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin(&t->fileDescriptorList);
-    for (int i = 0; i < args[1]; i++) {
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
       e = list_next(e);
     }
     struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
@@ -129,16 +141,16 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = tell;
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_CLOSE) {
-      lock_acquire(&globalFileLock);
-      struct list_elem *e = list_begin(&t->fileDescriptorList);
-      int fd = args[1];
-      for (int i = 0; i < fd; i++) {
-        e = list_next(e);
-      }
-      struct list_elem *removed = list_remove(e);
-      struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
-      file_close(fileD->fileptr);
-      lock_release(&globalFileLock);
+    lock_acquire(&globalFileLock);
+    struct list_elem *e = list_begin(&t->fileDescriptorList);
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
+      e = list_next(e);
+    }
+    struct list_elem *removed = list_remove(e);
+    struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
+    file_close(fileD->fileptr);
+    lock_release(&globalFileLock);
   }
 
   if (args[0] == SYS_HALT) {

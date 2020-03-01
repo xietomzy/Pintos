@@ -124,6 +124,8 @@ start_process (void *file_name_)
   if_.esp -= 4; // push null ptr for return address
   memcpy(if_.esp, &zero, 4);
 
+  hex_dump(0, &if_, 100, true);
+
   /* If load failed, quit. */
   palloc_free_page (args[0]);
   if (!success)

@@ -70,7 +70,7 @@ start_process (void *file_name_)
     index++;
     if (index == num_args && token != NULL) {
       printf("Too many arguments");
-      thread_exit();
+      //thread_exit();
     }
   }
   
@@ -95,37 +95,41 @@ start_process (void *file_name_)
 
   /* word-align */
   int stack_align = ((int) if_.esp) & 0xF; // get last half-byte (align stack to a 16 bit boundary) 
-  int stack_align2 = (4 * argc + 4 + 4) & 0xF; // get last half-byte (for additional aligning)
+  int stack_align2 = (4 * (argc + 1) + 4 + 4) & 0xF; // get last half-byte (for additional aligning)
   int zero = 0;
   for (int i = 0; i < stack_align; i++) { // fill with zeroes up to boundary
     if_.esp -= 1;
     memcpy(if_.esp, &zero, 1);
   }
-  for (int i = 0; i < 16 - stack_align2; i++) { // fill with zeroes for additional aligning
-    if_.esp -= 1;
-    memcpy(if_.esp, &zero, 1);
+  for (int i = 0; i < (16 - stack_align2) / 4; i++) { // fill with zeroes for additional aligning
+    if_.esp -= 4;
+    * (int *) if_.esp = 0;
   }
 
   if_.esp -= 4; // ensure argv[argc] is NULL
-  memcpy(if_.esp, &zero, 4);
+  * (int *) if_.esp = 0;
 
   for (int i = argc - 1; i > -1; i--) { // push arg addresses in reverse order
     if_.esp -= 4;
-    memcpy(if_.esp, (void *) arg_addrs[i], 4);
+    * (int *) if_.esp = arg_addrs[i];
   }
 
   int argv = (int) if_.esp; // push address of argv
   if_.esp -= 4;
-  memcpy(if_.esp, &argv, 4);
+  * (int *) if_.esp = argv;
 
   if_.esp -=4; // push argc
-  memcpy(if_.esp, &argc, 4);
+  * (int *) if_.esp = argc;
 
   if_.esp -= 4; // push null ptr for return address
-  memcpy(if_.esp, &zero, 4);
+  * (int *) if_.esp = 0;
 
+<<<<<<< HEAD
   hex_dump(0, &if_, 100, true);
 
+=======
+  //hex_dump(0, if_.esp, 100, true);
+>>>>>>> 69b6cebf2fba2d118662052cdd70cd93fdfdd65b
   /* If load failed, quit. */
   palloc_free_page (args[0]);
   if (!success)

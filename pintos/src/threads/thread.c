@@ -92,6 +92,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init(&fileDescriptorList);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -463,6 +464,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  #ifdef USERPROG
+    list_init(&t->fileDescriptorList);
+    t->fileDesc = 0;
+  #endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

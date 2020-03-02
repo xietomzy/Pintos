@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "threads/malloc.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -182,6 +183,23 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  /* Initialize status struct. */
+  struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
+  ASSERT (s_status != NULL);
+  t->self_status = s_status;
+  status_init(t->self_status);
+  // Initialize list of children.
+  list_init(&t->children_status);
+
+  // Push child status onto parent children if possible
+  if (thread_current()->self_status != NULL) {
+    list_push_back(&thread_current()->children_status, &t->self_status->elem);
+    // Increment ref_cnt
+    lock_acquire(&t->self_status->ref_lock);
+    t->self_status->ref_cnt++;
+    lock_release(&t->self_status->ref_lock);
+  }
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);

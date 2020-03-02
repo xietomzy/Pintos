@@ -28,14 +28,23 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   if (args[0] == SYS_EXIT) {
       f->eax = args[1];
-      // printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
+      printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_exit();
   }
+  else if (args[0] == SYS_PRACTICE) {
+      f->eax = args[1]++;
+      return;
+  }
   else if (args[0] == SYS_HALT) {
-      shutdown();
-  } else if (args[0] == SYS_WAIT) {
+      shutdown_power_off();
+      NOT_REACHED();
+  }
+  else if (args[0] == SYS_WAIT) {
     // TODO
-  } else if (args[0] == SYS_EXEC) {
+  }
+  else if (args[0] == SYS_EXEC) {
     // TODO
+    f->eax = process_execute(args[1]);
+    return;
   }
 }

@@ -50,8 +50,18 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = args[1];
     printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
     thread_exit ();
+  } else if (args[0] == SYS_PRACTICE) {
+    f->eax = args[1]++;
+    return;
   } else if (args[0] == SYS_HALT) {
     shutdown_power_off();
+    NOT_REACHED();
+  } else if (args[0] == SYS_WAIT) {
+    // TODO
+  } else if (args[0] == SYS_EXEC) {
+    // TODO
+    f->eax = process_execute(args[1]);
+    return;
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -154,6 +164,4 @@ syscall_handler (struct intr_frame *f UNUSED)
     file_close(fileD->fileptr);
     lock_release(&globalFileLock);
   }
-
-
 }

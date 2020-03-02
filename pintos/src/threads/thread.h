@@ -105,6 +105,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+  struct fileDescriptor
+    {
+      struct list_elem fileElem;
+      struct file *fileptr;
+    };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

@@ -465,7 +465,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
     list_init(&t->fileDescriptorList);
-    t->fileDesc = 0;
+    t->fileDesc = 2;
   #endif
 
   old_level = intr_disable ();

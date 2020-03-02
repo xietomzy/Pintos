@@ -33,6 +33,8 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  printf("FILENAME: %s", file_name);
+
   sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -46,7 +48,9 @@ process_execute (const char *file_name)
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  // Semaphore for after start_process
+  // Call P here/Down
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -136,7 +140,6 @@ start_process (void *file_name_)
   if_.esp -= 4; // push null ptr for return address
   * (int *) if_.esp = 0;
 
-  //hex_dump(0, if_.esp, 100, true);
   /* If load failed, quit. */
   palloc_free_page (args[0]);
   if (!success)

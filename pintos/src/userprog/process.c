@@ -43,6 +43,10 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char buffer[strlen(fn_copy) + 1];
+  strlcpy (buffer, fn_copy, strlen(fn_copy) + 1);
+  char *saveptr;
+  char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   // Semaphore for after start_process
@@ -154,8 +158,9 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
+  if (child_tid == NULL)
   sema_down (&temporary);
   return 0;
 }

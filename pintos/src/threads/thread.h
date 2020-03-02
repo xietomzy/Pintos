@@ -161,6 +161,7 @@ struct list children_status;      /* List of children as statuses */
 void status_init (struct child_status *status) {
     sema_init(status->load, 0);
     sema_init(status->finished, 0);
+    lock_init(status->ref_lock);
 }
 
 // Wait process on child

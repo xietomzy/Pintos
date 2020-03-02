@@ -178,7 +178,7 @@ process_wait (tid_t child_tid)
   // Don't forget to malloc something
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
-      sema_down(&temporary); // original code we had before
+      // sema_down(&temporary); // original code we had before
       return 0;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);

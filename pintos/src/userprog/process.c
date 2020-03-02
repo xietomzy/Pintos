@@ -67,7 +67,7 @@ process_execute (const char *file_name)
 
   // Create wrapper struct
   struct child_info *wrapper = (struct child_info *)malloc(sizeof(struct child_info));
-  wrapper->file_name = token;
+  wrapper->file_name = fn_copy;
   wrapper->status = s_status;
 
   /* Create a new thread to execute FILE_NAME. */
@@ -165,6 +165,7 @@ start_process (void *wrapper)
   * (int *) if_.esp = 0;
 
   /* If load failed, quit. */
+  palloc_free_page (args[0]);
   if (!success) {
     sema_up(&thread_current()->self_status->load);
     thread_exit();
@@ -218,7 +219,7 @@ process_wait (tid_t child_tid)
       sema_down(&(curr_child->finished));
       curr_thread->self_status->exit_code = curr_child->exit_code;
       // Child has died and we are done, free status
-      free(curr_child->self_status);
+      free(curr_child);
       return curr_child->exit_code;
     }
   }

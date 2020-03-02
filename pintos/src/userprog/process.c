@@ -63,7 +63,7 @@ process_execute (const char *file_name)
   ASSERT (s_status != NULL);
   status_init(s_status);
   s_status->successful_load = false;
-  s_status->ref_cnt = 2;
+  s_status->ref_cnt = 1;
 
   // Create wrapper struct
   struct child_info *wrapper = (struct child_info *)malloc(sizeof(struct child_info));

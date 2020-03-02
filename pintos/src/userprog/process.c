@@ -241,6 +241,12 @@ process_exit (void)
   lock_release(&(cur->self_status->ref_lock));
 
 
+  while(!list_empty(&cur->fileDescriptorList)) {
+    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
+    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
+    free(fileD);
+  }
+  //sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current

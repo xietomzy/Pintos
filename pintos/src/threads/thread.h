@@ -91,9 +91,15 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
+    struct list children_status;      /* List of children as statuses. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    /* Another list_elem indicator. */
+    struct list_elem child_thread_elem; 
+
+    struct semaphore load;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -141,5 +147,19 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Child status struct, allocated on the heap for access from both parent and child. */
+struct child_status {
+    bool successful_load;       /*Whether the child loaded properly*/
+    struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
+    struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
+    int ref_cnt;                /*Number of threads watching this status.*/
+    tid_t childTid;             /*Child thread ID*/
+    int exit_code;              /*Child exit code*/
+    struct semaphore finished; /*0 = child running, 1 = child finished*/
+};
+
+// Initiate child_status struct for this thread
+void status_init (struct child_status *status);
 
 #endif /* threads/thread.h */

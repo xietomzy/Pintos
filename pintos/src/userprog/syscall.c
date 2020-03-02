@@ -9,6 +9,8 @@
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
+#include "devices/shutdown.h"
+
 
 struct lock globalFileLock;
 
@@ -21,7 +23,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static bool validate(uint32_t* pd, const void* ptr) {
+static bool validate(uint32_t *pd, const void* ptr) {
   return ptr != NULL && pagedir_get_page(pd, ptr) && is_user_vaddr(ptr);
 }
 
@@ -38,11 +40,28 @@ syscall_handler (struct intr_frame *f UNUSED)
    */
 
   /* printf("System call number: %d\n", args[0]); */
+
+  if (!is_user_vaddr(args)) { // if esp is invalid
+    thread_exit();
+  }
+
   struct thread *t = thread_current();
   if (args[0] == SYS_EXIT) {
     f->eax = args[1];
     printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
     thread_exit ();
+  } else if (args[0] == SYS_PRACTICE) {
+    f->eax = args[1] + 1;
+    return;
+  } else if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+    NOT_REACHED();
+  } else if (args[0] == SYS_WAIT) {
+    // TODO
+  } else if (args[0] == SYS_EXEC) {
+    // TODO
+    f->eax = process_execute(args[1]);
+    return;
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -154,5 +173,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
     file_close(fileD->fileptr);
     lock_release(&globalFileLock);
+  }
+  if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+  }
+
+  if (args[0] == SYS_EXEC) {
+    tid_t tid = process_execute(args[1]);
+  }
+
+  if (args[0] == SYS_PRACTICE) {
+    args[1] += 1; 
+  }
+
+  if (args[0] == SYS_WAIT) {
+    process_wait(args[1]);
   }
 }

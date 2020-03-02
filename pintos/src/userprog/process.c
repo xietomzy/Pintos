@@ -33,6 +33,8 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+  printf("FILENAME: %s", file_name);
+
   sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -41,8 +43,14 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  char buffer[strlen(fn_copy) + 1];
+  strlcpy (buffer, fn_copy, strlen(fn_copy) + 1);
+  char *saveptr;
+  char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  // Semaphore for after start_process
+  // Call P here/Down
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -57,17 +65,86 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  char *saveptr;
+  char *token = strtok_r(file_name, " ", &saveptr);
+
+  int num_args = 200;
+  char *args[num_args];
+  int index = 0;
+
+  while (token) {
+    args[index] = token;
+    token = strtok_r(NULL, " ", &saveptr);
+    index++;
+    if (index == num_args && token != NULL) {
+      printf("Too many arguments");
+      //thread_exit();
+    }
+  }
+
+  // Deny writing to the executable
+  struct file *executable = filesys_open(file_name_);
+  if (executable == NULL) {
+    printf("Executable not found");
+    thread_exit();
+  }
+  file_deny_write(executable);
+
+  int argc = index;
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (args[0], &if_.eip, &if_.esp);
+
+  /* push args strings onto stack */
+  int arg_len;
+  int arg_addrs[argc];
+  for (int i = 0; i < argc ; i++) {
+    arg_len = strlen(args[i]) + 1;
+    if_.esp -= arg_len;
+    arg_addrs[i] = (int) if_.esp;
+    memcpy(if_.esp, (void *) args[i], arg_len);
+  }
+
+  /* word-align */
+  int stack_align = ((int) if_.esp) & 0xF; // get last half-byte (align stack to a 16 bit boundary)
+  int stack_align2 = (4 * (argc + 1) + 4 + 4) & 0xF; // get last half-byte (for additional aligning)
+  int zero = 0;
+  for (int i = 0; i < stack_align; i++) { // fill with zeroes up to boundary
+    if_.esp -= 1;
+    memcpy(if_.esp, &zero, 1);
+  }
+  for (int i = 0; i < (16 - stack_align2) / 4; i++) { // fill with zeroes for additional aligning
+    if_.esp -= 4;
+    * (int *) if_.esp = 0;
+  }
+
+  if_.esp -= 4; // ensure argv[argc] is NULL
+  * (int *) if_.esp = 0;
+
+  for (int i = argc - 1; i > -1; i--) { // push arg addresses in reverse order
+    if_.esp -= 4;
+    * (int *) if_.esp = arg_addrs[i];
+  }
+
+  int argv = (int) if_.esp; // push address of argv
+  if_.esp -= 4;
+  * (int *) if_.esp = argv;
+
+  if_.esp -=4; // push argc
+  * (int *) if_.esp = argc;
+
+  if_.esp -= 4; // push null ptr for return address
+  * (int *) if_.esp = 0;
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  palloc_free_page (args[0]);
   if (!success)
     thread_exit ();
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -89,9 +166,19 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED)
+process_wait (tid_t child_tid)
 {
-  sema_down (&temporary);
+  struct thread *curr_thread = thread_current();
+  struct list children_status = curr_thread->children_status;
+  struct list_elem *e;
+  // Don't forget to malloc something 
+  for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    if (curr_child->childTid == childTid) {
+      // Call sema_down on semaphore associated with that child process
+      sema_down(&(curr_child->finished));
+    }
+  }
   return 0;
 }
 

@@ -171,10 +171,17 @@ process_wait (tid_t child_tid)
   struct thread *curr_thread = thread_current();
   struct list children_status = curr_thread->children_status;
   struct list_elem *e;
+  /*if (list_empty(&children_status)) {
+    printf("%d", list_empty(&children_status));
+    return -1;
+  }*/
   // Don't forget to malloc something 
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    if (e == NULL) {
+      return -1;
+    }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    if (curr_child->childTid == childTid) {
+    if (curr_child->childTid == child_tid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
       curr_thread->self_status->exit_code = curr_child->exit_code;

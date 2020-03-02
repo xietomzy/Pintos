@@ -32,4 +32,18 @@ syscall_handler (struct intr_frame *f UNUSED)
       printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
       thread_exit ();
     }
+
+  if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+  }
+
+  if (args[0] == SYS_EXEC) {
+    tid_t tid = process_execute(args[1]);
+  }
+
+  if (args[0] == SYS_PRACTICE) {
+    args[1] += 1; 
+  }
+
+  if (args[0] == WAIT)
 }

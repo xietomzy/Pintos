@@ -23,7 +23,7 @@
 //static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-struct thread get_child(tid_t )
+struct thread get_child(tid_t tid);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -166,7 +166,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
-  sema_down(&temporary);
+  //sema_down(&temporary);
   return 0;
   struct thread *curr_thread = thread_current();
   struct list children_status = curr_thread->children_status;
@@ -253,7 +253,7 @@ process_exit (void)
     struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
     free(fileD);
   }
-  sema_up (&temporary);
+  //sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current

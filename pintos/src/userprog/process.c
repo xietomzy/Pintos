@@ -33,7 +33,7 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  printf("FILENAME: %s", file_name);
+  //printf("FILENAME: %s", file_name);
 
   sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
@@ -48,7 +48,7 @@ process_execute (const char *file_name)
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   // Semaphore for after start_process
   // Call P here/Down
   if (tid == TID_ERROR)
@@ -168,6 +168,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  sema_down(&temporary);
+  return 0;
   struct thread *curr_thread = thread_current();
   struct list children_status = curr_thread->children_status;
   struct list_elem *e;
@@ -177,10 +179,12 @@ process_wait (tid_t child_tid)
   }*/
   // Don't forget to malloc something 
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
-    if (e == NULL) {
-      return -1;
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      sema_down(&temporary); // original code we had before
+      return 0;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    
     if (curr_child->childTid == child_tid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
@@ -219,6 +223,9 @@ process_exit (void)
   struct list_elem *e;
   struct list children_status = cur->children_status;
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      break; 
+    }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
     lock_acquire(&(curr_child->ref_lock));
     curr_child->ref_cnt -= 1;
@@ -246,7 +253,7 @@ process_exit (void)
     struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
     free(fileD);
   }
-  //sema_up (&temporary);
+  sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current

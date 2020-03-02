@@ -45,11 +45,16 @@ syscall_handler (struct intr_frame *f UNUSED)
    */
 
   /* printf("System call number: %d\n", args[0]); */
+
+  if (!is_user_vaddr(args)) { // if esp is invalid
+    thread_exit();
+  }
+
   struct thread *t = thread_current();
   if (args[0] == SYS_EXIT) {
     f->eax = args[1];
     printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
-    thread_exit ();
+    thread_exit();
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -161,5 +166,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   if (args[0] == SYS_EXEC) {
     // TODO
+  }
+  if (args[0] == SYS_PRACTICE) {
+    f->eax = args[1] + 1;
   }
 }

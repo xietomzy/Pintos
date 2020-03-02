@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <threads/malloc.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -13,12 +14,6 @@
 
 
 struct lock globalFileLock;
-
-struct fileDescriptor
-  {
-    struct list_elem fileElem;
-    struct file *fileptr;
-  };
 
 static void syscall_handler (struct intr_frame *);
 
@@ -63,7 +58,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     shutdown_power_off();
     NOT_REACHED();
   } else if (args[0] == SYS_WAIT) {
-    // TODO
+    process_wait(args[1]);
+    /*tid_t child_tid = args[1];
+    struct thread *cur = thread_current();
+    struct list_elem *e;
+    struct list children_status = cur->children_status;
+    int exit_code;
+    for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+      struct child_status *curr_child = list_entry (e, struct child_status, elem);
+      if (curr_child->childTid == child_tid) {
+        exit_code = process_wait(child_tid);
+        break;
+      }
+    }
+    f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
     // TODO
     f->eax = process_execute(args[1]);
@@ -71,36 +79,113 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
-      struct file* filePtr = filesys_open(args[1]);
+      const char* file = (char*) args[1];
+      struct file* filePtr = filesys_open(file);
       struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
       fileD->fileptr = filePtr;
       list_push_back(&t->fileDescriptorList, &fileD->fileElem);
+      f->eax = t->fileDesc;
       t->fileDesc += 1;
-      f->eax = filePtr;
       lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_CREATE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
-      bool success = file_write(args[1], args[2], args[3]);
+      const char* file = (char*) args[1];
+      unsigned size = args[2];
+      bool success = filesys_create(file, size);
       f->eax = success;
       lock_release(&globalFileLock);
     }
-  }
-  if (args[0] == SYS_HALT) {
-    shutdown_power_off();
-  }
-
-  if (args[0] == SYS_EXEC) {
-    tid_t tid = process_execute(args[1]);
-  }
-
-  if (args[0] == SYS_PRACTICE) {
-    args[1] += 1;
-  }
-
-
-  if (args[0] == SYS_WAIT) {
-    process_wait(args[1]);
+  } else if (args[0] == SYS_REMOVE) {
+    if (validate(t->pagedir, args[1])) {
+      lock_acquire(&globalFileLock);
+      const char* file = (char*) args[1];
+      bool success = filesys_remove(file);
+      f->eax = success;
+      lock_release(&globalFileLock);
+    }
+  } else if (args[0] == SYS_FILESIZE) {
+    lock_acquire(&globalFileLock);
+    struct list_elem *e = list_begin (&t->fileDescriptorList);
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
+      e = list_next(e);
+    }
+    struct fileDescriptor* fileD = list_entry(e, struct fileDescriptor, fileElem);
+    off_t size = file_length(fileD->fileptr);
+    f->eax = size;
+    lock_release(&globalFileLock);
+  } else if (args[0] == SYS_READ) {
+    if (validate(t->pagedir, args[2])) {
+      lock_acquire(&globalFileLock);
+      int fd = args[1];
+      if (fd == 0) {
+          //input_getc()
+      } else {
+        struct list_elem *e = list_begin(&t->fileDescriptorList);
+        for (int i = 2; i < fd; i++) {
+          e = list_next(e);
+        }
+        void* buffer = (void*) args[2];
+        unsigned sizeB = args[3];
+        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+        off_t size = file_read(fileD->fileptr, buffer, sizeB);
+        f->eax = size;
+        lock_release(&globalFileLock);
+      }
+    }
+  } else if (args[0] == SYS_WRITE) {
+    if (validate(t->pagedir, args[2])) {
+      lock_acquire(&globalFileLock);
+      int fd = args[1];
+      const void* buffer = (void*) args[2];
+      unsigned sizeB = args[3];
+      if (fd == 1) {
+        putbuf(buffer, sizeB);
+      } else {
+        struct list_elem *e = list_begin(&t->fileDescriptorList);
+        for (int i = 2; i < fd; i++) {
+          e = list_next(e);
+        }
+        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+        off_t size = file_write(fileD->fileptr, buffer, sizeB);
+        f->eax = size;
+      }
+      lock_release(&globalFileLock);
+    }
+  } else if (args[0] == SYS_SEEK) {
+    lock_acquire(&globalFileLock);
+    struct list_elem *e = list_begin(&t->fileDescriptorList);
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
+      e = list_next(e);
+    }
+    struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+    unsigned size = args[2];
+    file_seek(fileD->fileptr, size);
+    lock_release(&globalFileLock);
+  } else if (args[0] == SYS_TELL) {
+    lock_acquire(&globalFileLock);
+    struct list_elem *e = list_begin(&t->fileDescriptorList);
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
+      e = list_next(e);
+    }
+    struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+    off_t tell = file_tell(fileD->fileptr);
+    f->eax = tell;
+    lock_release(&globalFileLock);
+  } else if (args[0] == SYS_CLOSE) {
+    lock_acquire(&globalFileLock);
+    struct list_elem *e = list_begin(&t->fileDescriptorList);
+    int fd = args[1];
+    for (int i = 2; i < fd; i++) {
+      e = list_next(e);
+    }
+    struct list_elem *removed = list_remove(e);
+    struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
+    file_close(fileD->fileptr);
+    lock_release(&globalFileLock);
   }
 }

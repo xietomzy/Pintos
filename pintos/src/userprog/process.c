@@ -23,6 +23,7 @@
 //static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+struct thread get_child(tid_t )
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -34,7 +35,7 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
-  printf("FILENAME: %s", file_name);
+  //printf("FILENAME: %s", file_name);
 
   //sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
@@ -49,7 +50,7 @@ process_execute (const char *file_name)
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -165,18 +166,32 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid)
 {
+  sema_down(&temporary);
+  return 0;
   struct thread *curr_thread = thread_current();
   struct list children_status = curr_thread->children_status;
   struct list_elem *e;
+  /*if (list_empty(&children_status)) {
+    printf("%d", list_empty(&children_status));
+    return -1;
+  }*/
   // Don't forget to malloc something
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      sema_down(&temporary); // original code we had before
+      return 0;
+    }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
+
     if (curr_child->childTid == child_tid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
+      curr_thread->self_status->exit_code = curr_child->exit_code;
+      curr_child->ref_cnt -= 1; // need to free memory
+      return curr_child->exit_code;
     }
   }
-  return 0;
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -204,16 +219,41 @@ process_exit (void)
     }
   // Close executable
   file_close(cur->executable);
-  // Indicate finished
-  sema_up (&cur->self_status->finished);
-  // Decrement ref_cnt and free status struct if 0
-  lock_acquire(&cur->self_status->ref_lock);
-  cur->self_status->ref_cnt--;
-  if (cur->self_status->ref_cnt == 0) {
-    free((void *)cur->self_status);
-  }
-  lock_release(&cur->self_status->ref_lock);
   //sema_up (&temporary);
+  struct list_elem *e;
+  struct list children_status = cur->children_status;
+  for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      break;
+    }
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    lock_acquire(&(curr_child->ref_lock));
+    curr_child->ref_cnt -= 1;
+    if (curr_child->ref_cnt == 0) {
+      lock_release(&(curr_child->ref_lock));
+      list_remove(e);
+      free(curr_child);
+    }
+    lock_release(&(curr_child->ref_lock));
+  }
+
+  lock_acquire(&(cur->self_status->ref_lock));
+  cur->self_status->ref_cnt -= 1;
+  if (cur->self_status->ref_cnt == 0) {
+    lock_release(&(cur->self_status->ref_lock));
+    free(cur->self_status);
+  } else if (cur->self_status->ref_cnt == 1) {
+    sema_up(&(cur->self_status->finished)); // only sema_up if parent process exists
+  }
+  lock_release(&(cur->self_status->ref_lock));
+
+
+  while(!list_empty(&cur->fileDescriptorList)) {
+    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
+    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
+    free(fileD);
+  }
+  sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current

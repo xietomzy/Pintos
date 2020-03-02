@@ -189,7 +189,8 @@ thread_create (const char *name, int priority,
   ASSERT (s_status != NULL);
   t->self_status = s_status;
   status_init(t->self_status);
-  // Initialize list of children.
+  t->self_status->successful_load = false;
+  // Initialize list of children status.
   list_init(&t->children_status);
 
   // Push child status onto parent children if possible
@@ -218,6 +219,13 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+
+  // Wait for thread to load
+  sema_down(&s_status->load);
+  if (!s_status->successful_load) {
+    free((void *)s_status);
+    return TID_ERROR;
+  }
 
   return tid;
 }
@@ -409,6 +417,8 @@ idle (void *idle_started_ UNUSED)
   struct semaphore *idle_started = idle_started_;
   idle_thread = thread_current ();
   sema_up (idle_started);
+  idle_thread->self_status->successful_load = true;
+  sema_up (&idle_thread->self_status->load);
 
   for (;;)
     {

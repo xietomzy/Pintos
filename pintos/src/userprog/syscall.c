@@ -9,6 +9,7 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 #include "devices/shutdown.h"
+#include "userprog/process.h"
 
 
 struct lock globalFileLock;
@@ -44,7 +45,7 @@ syscall_handler (struct intr_frame *f UNUSED)
    * include it in your final submission.
    */
 
-  /* printf("System call number: %d\n", args[0]); */
+  // printf("System call number: %d\n", args[0]);
 
   if (!is_user_vaddr(args)) { // if esp is invalid
     thread_exit();
@@ -78,7 +79,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = filePtr;
       lock_release(&globalFileLock);
     }
-  } else if (args[0] == SYS_CREATE) { 
+  } else if (args[0] == SYS_CREATE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
       bool success = file_write(args[1], args[2], args[3]);
@@ -95,7 +96,7 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 
   if (args[0] == SYS_PRACTICE) {
-    args[1] += 1; 
+    args[1] += 1;
   }
 
 

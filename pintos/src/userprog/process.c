@@ -14,12 +14,13 @@
 #include "threads/flags.h"
 #include "threads/init.h"
 #include "threads/interrupt.h"
+#include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
-static struct semaphore temporary;
+//static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -35,7 +36,7 @@ process_execute (const char *file_name)
 
   printf("FILENAME: %s", file_name);
 
-  sema_init (&temporary, 0);
+  //sema_init (&temporary, 0);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -49,8 +50,6 @@ process_execute (const char *file_name)
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  // Semaphore for after start_process
-  // Call P here/Down
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -78,17 +77,10 @@ start_process (void *file_name_)
     index++;
     if (index == num_args && token != NULL) {
       printf("Too many arguments");
-      //thread_exit();
+      sema_up(&thread_current()->self_status->load);
+      thread_exit();
     }
   }
-
-  // Deny writing to the executable
-  struct file *executable = filesys_open(file_name_);
-  if (executable == NULL) {
-    printf("Executable not found");
-    thread_exit();
-  }
-  file_deny_write(executable);
 
   int argc = index;
 
@@ -142,9 +134,14 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (args[0]);
-  if (!success)
-    thread_exit ();
+  if (!success) {
+    sema_up(&thread_current()->self_status->load);
+    thread_exit();
+  }
 
+  // About to start execution, let parent know we are successful
+  thread_current()->self_status->successful_load = true;
+  sema_up(&thread_current()->self_status->load);
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -171,10 +168,10 @@ process_wait (tid_t child_tid)
   struct thread *curr_thread = thread_current();
   struct list children_status = curr_thread->children_status;
   struct list_elem *e;
-  // Don't forget to malloc something 
+  // Don't forget to malloc something
   for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    if (curr_child->childTid == childTid) {
+    if (curr_child->childTid == child_tid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
     }
@@ -205,7 +202,18 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  sema_up (&temporary);
+  // Close executable
+  file_close(cur->executable);
+  // Indicate finished
+  sema_up (&cur->self_status->finished);
+  // Decrement ref_cnt and free status struct if 0
+  lock_acquire(&cur->self_status->ref_lock);
+  cur->self_status->ref_cnt--;
+  if (cur->self_status->ref_cnt == 0) {
+    free((void *)cur->self_status);
+  }
+  lock_release(&cur->self_status->ref_lock);
+  //sema_up (&temporary);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -321,6 +329,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
       goto done;
     }
 
+  t->executable = file;
+  file_deny_write(file);
+
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -404,7 +415,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   return success;
 }
 

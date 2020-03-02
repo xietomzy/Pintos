@@ -93,6 +93,7 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
     struct list children_status;      /* List of children as statuses */
+    struct file *executable;          /* Executable this thread was loaded from. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */

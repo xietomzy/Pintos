@@ -81,7 +81,7 @@ start_process (void *file_name_)
   // Deny writing to the executable
   struct file *executable = filesys_open(file_name_);
   if (executable == NULL) {
-    perror("Executable not found");
+    printf("Executable not found");
     thread_exit();
   }
   file_deny_write(executable);
@@ -163,9 +163,8 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid)
+process_wait (tid_t child_tid UNUSED)
 {
-  if (child_tid == NULL)
   sema_down (&temporary);
   return 0;
 }

@@ -580,9 +580,9 @@ allocate_tid (void)
 }
 
 void status_init (struct child_status *status) {
-    sema_init(status->load, 0);
-    sema_init(status->finished, 0);
-    lock_init(status->ref_lock);
+    sema_init(&status->load, 0);
+    sema_init(&status->finished, 0);
+    lock_init(&status->ref_lock);
 }
 
 /* Offset of `stack' member within `struct thread'.

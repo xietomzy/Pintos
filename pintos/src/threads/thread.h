@@ -154,12 +154,9 @@ struct child_status {
     tid_t childTid;             /*Child thread ID*/
     int exit_code;              /*Child exit code*/
     struct semaphore finished; /*0 = child running, 1 = child finished*/
-}
+};
 
 // Initiate child_status struct for this thread
 void status_init (struct child_status *status);
-
-/* Enforce one-to-one mapping of processes to threads. */
-typedef pid_t tid_t;
 
 #endif /* threads/thread.h */

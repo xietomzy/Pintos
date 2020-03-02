@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <threads/malloc.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -10,12 +11,6 @@
 #include "filesys/file.h"
 
 struct lock globalFileLock;
-
-struct fileDescriptor
-  {
-    struct list_elem fileElem;
-    struct file *fileptr;
-  };
 
 static void syscall_handler (struct intr_frame *);
 
@@ -51,25 +46,29 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
-      struct file* filePtr = filesys_open(args[1]);
+      const char* file = (char*) args[1];
+      struct file* filePtr = filesys_open(file);
       struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
       fileD->fileptr = filePtr;
       list_push_back(&t->fileDescriptorList, &fileD->fileElem);
+      f->eax = t->fileDesc;
       t->fileDesc += 1;
-      f->eax = filePtr;
       lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_CREATE) { 
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
-      bool success = file_write(args[1], args[2], args[3]);
+      const char* file = (char*) args[1];
+      unsigned size = args[2];
+      bool success = filesys_create(file, size);
       f->eax = success;
       lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_REMOVE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
-      bool success = filesys_remove(args[1]);
+      const char* file = (char*) args[1];
+      bool success = filesys_remove(file);
       f->eax = success;
       lock_release(&globalFileLock);
     }
@@ -80,7 +79,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     for (int i = 2; i < fd; i++) {
       e = list_next(e);
     }
-    struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+    struct fileDescriptor* fileD = list_entry(e, struct fileDescriptor, fileElem);
     off_t size = file_length(fileD->fileptr);
     f->eax = size;
     lock_release(&globalFileLock);
@@ -90,29 +89,34 @@ syscall_handler (struct intr_frame *f UNUSED)
       int fd = args[1];
       if (fd == 0) {
           //input_getc()
+      } else {
+        struct list_elem *e = list_begin(&t->fileDescriptorList);
+        for (int i = 2; i < fd; i++) {
+          e = list_next(e);
+        }
+        void* buffer = (void*) args[2];
+        unsigned sizeB = args[3];
+        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+        off_t size = file_read(fileD->fileptr, buffer, sizeB);
+        f->eax = size;
+        lock_release(&globalFileLock);
       }
-      struct list_elem *e = list_begin(&t->fileDescriptorList);
-      for (int i = 2; i < fd; i++) {
-        e = list_next(e);
-      }
-      struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-      off_t size = file_read(fileD->filept, args[2], args[3]);
-      f->eax = size;
-      lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_WRITE) {
     if (validate(t->pagedir, args[2])) {
       lock_acquire(&globalFileLock);
       int fd = args[1];
+      const void* buffer = (void*) args[2];
+      unsigned sizeB = args[3];
       if (fd == 1) {
-        putbuf(args[2], args[3]);
+        putbuf(buffer, sizeB);
       } else {
         struct list_elem *e = list_begin(&t->fileDescriptorList);
         for (int i = 2; i < fd; i++) {
           e = list_next(e);
         }
         struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-        off_t size = file_write(fileD->fileptr, args[2], args[3]);
+        off_t size = file_write(fileD->fileptr, buffer, sizeB);
         f->eax = size;
       }
       lock_release(&globalFileLock);
@@ -125,7 +129,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       e = list_next(e);
     }
     struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-    file_seek(fileD->fileptr, args[2]);
+    unsigned size = args[2];
+    file_seek(fileD->fileptr, size);
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_TELL) {
     lock_acquire(&globalFileLock);

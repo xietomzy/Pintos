@@ -163,7 +163,7 @@ void status_init (struct child_status *status) {
     sema_init(status->finished, 0);
 }
 
-// Wait process on child
+// Wait process on child, helper function for syscall wait
 void process_wait (tid_t childTid) {
   //TODO
 }

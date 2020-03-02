@@ -92,10 +92,13 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
-    struct list children_status;      /* List of children as statuses */
+    struct list children_status;      /* List of children as statuses. */
+    struct list children_threads;     /* List of children threads. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    /* Another list_elem indicator. */
+    struct list_elem child_thread_elem; 
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

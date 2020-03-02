@@ -165,7 +165,19 @@ void status_init (struct child_status *status) {
 
 // Wait process on child, helper function for syscall wait
 void process_wait (tid_t childTid) {
-  //TODO
+  // First, iterate through children thread, and fetch the child tid that matches it
+  // for each child thread in the current thread...
+  struct thread *curr_thread = thread_current();
+  struct list children_status = curr_thread->children_status;
+  struct list_elem *e;
+  // Don't forget to malloc something 
+  for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    if (curr_child->childTid == childTid) {
+      // Call sema_down on semaphore associated with that child process
+      sema_down(&(curr_child->finished));
+    }
+  }
 }
 
 /* Enforce one-to-one mapping of processes to threads. */

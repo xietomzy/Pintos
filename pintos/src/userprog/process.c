@@ -177,9 +177,12 @@ process_wait (tid_t child_tid)
     if (curr_child->childTid == childTid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
+      curr_thread->self_status->exit_code = curr_child->exit_code;
+      curr_child->ref_cnt -= 1; // need to free memory
+      return curr_child->exit_code;
     }
   }
-  return 0;
+  return -1;
 }
 
 /* Free the current process's resources. */
@@ -205,7 +208,32 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  sema_up (&temporary);
+  //sema_up (&temporary);
+  struct list_elem *e;
+  struct list children_status = cur->children_status;
+  for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    lock_acquire(&(curr_child->ref_lock));
+    curr_child->ref_cnt -= 1;
+    if (curr_child->ref_cnt == 0) {
+      lock_release(&(curr_child->ref_lock));
+      list_remove(e);
+      free(curr_child);
+    }
+    lock_release(&(curr_child->ref_lock));
+  }
+
+  lock_acquire(&(cur->self_status->ref_lock));
+  cur->self_status->ref_cnt -= 1;
+  if (cur->self_status->ref_cnt == 0) {
+    lock_release(&(cur->self_status->ref_lock));
+    free(cur->self_status);
+  } else if (cur->self_status->ref_cnt == 1) {
+    sema_up(&(cur->self_status->finished)); // only sema_up if parent process exists
+  }
+  lock_release(&(cur->self_status->ref_lock));
+
+
 }
 
 /* Sets up the CPU for running user code in the current

@@ -91,7 +91,8 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    struct child_status *status;         /* Pointer to thread status for parent-child communication. */
+    struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
+    struct list children_status;      /* List of children as statuses */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -153,9 +154,7 @@ struct child_status {
     tid_t childTid;             /*Child thread ID*/
     int exit_code;              /*Child exit code*/
     struct semaphore finished; /*0 = child running, 1 = child finished*/
-};
-struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
-struct list children_status;      /* List of children as statuses */
+}
 
 // Initiate child_status struct for this thread
 void status_init (struct child_status *status) {

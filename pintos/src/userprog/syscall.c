@@ -85,4 +85,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (args[0] == SYS_PRACTICE) {
     args[1] += 1; 
   }
+
+  if (args[0] == SYS_WAIT) {
+    
+  }
 }

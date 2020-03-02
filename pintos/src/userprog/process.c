@@ -81,7 +81,15 @@ start_process (void *file_name_)
       //thread_exit();
     }
   }
-  
+
+  // Deny writing to the executable
+  struct file *executable = filesys_open(file_name_);
+  if (executable == NULL) {
+    perror("Executable not found");
+    thread_exit();
+  }
+  file_deny_write(executable);
+
   int argc = index;
 
   /* Initialize interrupt frame and load executable. */
@@ -102,7 +110,7 @@ start_process (void *file_name_)
   }
 
   /* word-align */
-  int stack_align = ((int) if_.esp) & 0xF; // get last half-byte (align stack to a 16 bit boundary) 
+  int stack_align = ((int) if_.esp) & 0xF; // get last half-byte (align stack to a 16 bit boundary)
   int stack_align2 = (4 * (argc + 1) + 4 + 4) & 0xF; // get last half-byte (for additional aligning)
   int zero = 0;
   for (int i = 0; i < stack_align; i++) { // fill with zeroes up to boundary

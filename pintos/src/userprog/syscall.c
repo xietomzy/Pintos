@@ -98,6 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     args[1] += 1; 
   }
 
+
   if (args[0] == SYS_WAIT) {
     process_wait(args[1]);
   }

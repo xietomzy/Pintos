@@ -189,11 +189,8 @@ thread_create (const char *name, int priority,
   ASSERT (s_status != NULL);
   t->self_status = s_status;
   status_init(t->self_status);
-  // Initialize list of children status.
+  // Initialize list of children.
   list_init(&t->children_status);
-  /* Initialize children thread struct. */
-  // Initialize list of children threads
-  list_init(&t->children_threads);
 
   // Push child status onto parent children if possible
   if (thread_current()->self_status != NULL) {

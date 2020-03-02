@@ -78,7 +78,7 @@ start_process (void *file_name_)
     index++;
     if (index == num_args && token != NULL) {
       printf("Too many arguments");
-      //thread_exit();
+      thread_exit();
     }
   }
 

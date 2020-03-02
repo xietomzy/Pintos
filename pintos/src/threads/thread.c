@@ -184,22 +184,13 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  /* Initialize status struct. */
-  struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
-  ASSERT (s_status != NULL);
-  t->self_status = s_status;
-  status_init(t->self_status);
-  t->self_status->successful_load = false;
   // Initialize list of children status.
-  list_init(&t->children_status);
+  t->children_status = (struct list *)malloc(sizeof(struct list));
+  list_init(t->children_status);
 
-  // Push child status onto parent children if possible
-  if (thread_current()->self_status != NULL) {
-    list_push_back(&thread_current()->children_status, &t->self_status->elem);
-    // Increment ref_cnt
-    lock_acquire(&t->self_status->ref_lock);
-    t->self_status->ref_cnt++;
-    lock_release(&t->self_status->ref_lock);
+  // Add to parent if possible
+  if (thread_current()->children_status != NULL) {
+    list_push_back(thread_current()->children_status, &t->self_status->elem);
   }
 
   /* Stack frame for kernel_thread(). */
@@ -219,13 +210,6 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-
-  // Wait for thread to load
-  sema_down(&s_status->load);
-  if (!s_status->successful_load) {
-    free((void *)s_status);
-    return TID_ERROR;
-  }
 
   return tid;
 }
@@ -417,8 +401,6 @@ idle (void *idle_started_ UNUSED)
   struct semaphore *idle_started = idle_started_;
   idle_thread = thread_current ();
   sema_up (idle_started);
-  idle_thread->self_status->successful_load = true;
-  sema_up (&idle_thread->self_status->load);
 
   for (;;)
     {

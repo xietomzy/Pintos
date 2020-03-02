@@ -54,7 +54,19 @@ syscall_handler (struct intr_frame *f UNUSED)
   if (args[0] == SYS_EXIT) {
     f->eax = args[1];
     printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
-    thread_exit();
+    thread_exit ();
+  } else if (args[0] == SYS_PRACTICE) {
+    f->eax = args[1]++;
+    return;
+  } else if (args[0] == SYS_HALT) {
+    shutdown_power_off();
+    NOT_REACHED();
+  } else if (args[0] == SYS_WAIT) {
+    // TODO
+  } else if (args[0] == SYS_EXEC) {
+    // TODO
+    f->eax = process_execute(args[1]);
+    return;
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -66,7 +78,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = filePtr;
       lock_release(&globalFileLock);
     }
-  } else if (args[0] == SYS_CREATE) { 
+  } else if (args[0] == SYS_CREATE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
       bool success = file_write(args[1], args[2], args[3]);
@@ -156,18 +168,5 @@ syscall_handler (struct intr_frame *f UNUSED)
     struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
     file_close(fileD->fileptr);
     lock_release(&globalFileLock);
-  }
-
-  if (args[0] == SYS_HALT) {
-    shutdown_power_off();
-  }
-  if (args[0] == SYS_WAIT) {
-    // TODO
-  }
-  if (args[0] == SYS_EXEC) {
-    // TODO
-  }
-  if (args[0] == SYS_PRACTICE) {
-    f->eax = args[1] + 1;
   }
 }

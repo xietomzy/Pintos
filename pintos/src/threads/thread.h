@@ -91,6 +91,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct child_status *status;         /* Pointer to thread status for parent-child communication. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -142,18 +143,32 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-/* Child status struct */
+/* Child status struct, allocated on the heap for access from both parent and child. */
 struct child_status {
     struct semaphore load;      /*Inform parent process when child has loaded*/
     bool successful_load;       /*Whether the child loaded properly*/
     struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
     struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
-    int ref_cnt;                /*0 = both parent and child dead | 1 = one alive, one dead | 2 = both alive*/
+    int ref_cnt;                /*Number of threads watching this status.*/
     tid_t childTid;             /*Child thread ID*/
     int exit_code;              /*Child exit code*/
     struct semaphore finished; /*0 = child running, 1 = child finished*/
 }
 struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
 struct list children_status;      /* List of children as statuses */
+
+// Initiate child_status struct for this thread
+void status_init (struct child_status *status) {
+    sema_init(status->load, 0);
+    sema_init(status->finished, 0);
+}
+
+// Wait process on child
+void process_wait (tid_t childTid) {
+  //TODO
+}
+
+/* Enforce one-to-one mapping of processes to threads. */
+typedef pid_t tid_t;
 
 #endif /* threads/thread.h */

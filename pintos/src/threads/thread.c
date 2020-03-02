@@ -463,10 +463,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  #ifdef USERPROG
-    list_init(&t->fileDescriptorList);
-    t->fileDesc = 0;
-  #endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -581,6 +577,12 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+void status_init (struct child_status *status) {
+    sema_init(status->load, 0);
+    sema_init(status->finished, 0);
+    lock_init(status->ref_lock);
 }
 
 /* Offset of `stack' member within `struct thread'.

@@ -157,16 +157,7 @@ struct child_status {
 }
 
 // Initiate child_status struct for this thread
-void status_init (struct child_status *status) {
-    sema_init(status->load, 0);
-    sema_init(status->finished, 0);
-    lock_init(status->ref_lock);
-}
-
-// Wait process on child
-void process_wait (tid_t childTid) {
-  //TODO
-}
+void status_init (struct child_status *status);
 
 /* Enforce one-to-one mapping of processes to threads. */
 typedef pid_t tid_t;

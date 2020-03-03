@@ -104,6 +104,7 @@ struct thread
     {
       struct list_elem fileElem;
       struct file *fileptr;
+      int fd;
     };
 
 /* If false (default), use round-robin scheduler.

@@ -186,7 +186,8 @@ thread_create (const char *name, int priority,
   ASSERT (s_status != NULL);
   status_init(s_status);
   s_status->successful_load = false;
-  s_status->ref_cnt = 1;
+  s_status->childTid = tid;
+  s_status->ref_cnt = 2;
   t->self_status = s_status;
 
   // Add to parent

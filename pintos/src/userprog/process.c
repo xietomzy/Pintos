@@ -163,14 +163,14 @@ start_process (void *wrapper)
 
   /* If load failed, quit. */
   palloc_free_page (args[0]);
+  sema_up(&thread_current()->self_status->load);
   if (!success) {
-    sema_up(&thread_current()->self_status->load);
     thread_exit();
   }
 
   // About to start execution, let parent know we are successful
   thread_current()->self_status->successful_load = true;
-  sema_up(&thread_current()->self_status->load);
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -195,7 +195,6 @@ int
 process_wait (tid_t child_tid)
 {
   //sema_down(&temporary);
-  return 0;
   struct thread *curr_thread = thread_current();
   struct list *children_status = &curr_thread->children_status;
   struct list_elem *e;
@@ -214,10 +213,12 @@ process_wait (tid_t child_tid)
     if (curr_child->childTid == child_tid) {
       // Call sema_down on semaphore associated with that child process
       sema_down(&(curr_child->finished));
-      curr_thread->self_status->exit_code = curr_child->exit_code;
+      // curr_thread->self_status->exit_code = curr_child->exit_code;
+      int exit_code = curr_child->exit_code;
       // Child has died and we are done, free status
+      list_remove(&curr_child->elem);
       free(curr_child);
-      return curr_child->exit_code;
+      return exit_code;
     }
   }
   return -1;
@@ -229,6 +230,43 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  file_close(cur->executable);
+
+  struct list_elem *e;
+  struct list *children_status = &cur->children_status;
+  for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      break;
+    }
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    lock_acquire(&(curr_child->ref_lock));
+    curr_child->ref_cnt -= 1;
+    if (curr_child->ref_cnt == 0) {
+      // lock_release(&(curr_child->ref_lock));
+      list_remove(e);
+      lock_release(&(curr_child->ref_lock));
+      free(curr_child);
+    } else {
+      lock_release(&(curr_child->ref_lock));
+    }
+  }
+
+  lock_acquire(&(cur->self_status->ref_lock));
+  cur->self_status->ref_cnt -= 1;
+  lock_release(&(cur->self_status->ref_lock));
+  cur->self_status->exit_code = 0;
+  sema_up(&(cur->self_status->finished));
+  if (cur->self_status->ref_cnt == 0) {
+    free(cur->self_status);
+  }
+
+  // Free all file descriptors
+  while(!list_empty(&cur->fileDescriptorList)) {
+    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
+    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
+    free(fileD);
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -247,38 +285,6 @@ process_exit (void)
       pagedir_destroy (pd);
     }
   // Close executable (make available for writing)
-  file_close(cur->executable);
-
-  struct list_elem *e;
-  struct list *children_status = &cur->children_status;
-  for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
-      break;
-    }
-    struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    lock_acquire(&(curr_child->ref_lock));
-    curr_child->ref_cnt -= 1;
-    if (curr_child->ref_cnt == 0) {
-      // lock_release(&(curr_child->ref_lock));
-      list_remove(e);
-      free(curr_child);
-    }
-    lock_release(&(curr_child->ref_lock));
-  }
-
-  lock_acquire(&(cur->self_status->ref_lock));
-  cur->self_status->ref_cnt -= 1;
-  sema_up(&(cur->self_status->finished));
-  if (cur->self_status->ref_cnt == 0) {
-    free(cur->self_status);
-  }
-
-  // Free all file descriptors
-  while(!list_empty(&cur->fileDescriptorList)) {
-    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
-    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
-    free(fileD);
-  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -480,7 +486,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
   return success;
 }
 

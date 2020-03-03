@@ -28,10 +28,10 @@ struct thread get_child(tid_t tid);
 /* Wraps a file name and child_status struct for use in the child process
    created by process_execute. Note that main and idle will therefore
    inherently lack a child_status struct. */
-// struct child_info {
-//   char *file_name;
-//   struct child_status *status;
-// };
+struct pass_info {
+  char *file_name;
+  struct thread * parent;
+};
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -58,27 +58,32 @@ process_execute (const char *file_name)
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
 
+  struct pass_info* pass = malloc(sizeof(struct pass_info));
+  pass->parent = thread_current();
+  pass->file_name = fn_copy;
+ 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, pass);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     return TID_ERROR;
   }
-  struct child_status *child = NULL;
-  struct list *children = &thread_current()->children_status;
-  struct list_elem *e;
-  for (e = list_begin (children); e != list_end (children); e = list_next (e)) {
-    struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    if (curr_child->childTid == tid) {
-      child = curr_child;
-      break;
-    }
-  }
-  if (child == NULL) {
-      sema_down(&child->load);
-      if (child->successful_load) {
-        return tid;
-      }
+  // struct child_status *child = NULL;
+  // struct list *children = &thread_current()->children_status;
+  // struct list_elem *e;
+  // for (e = list_begin (children); e != list_end (children); e = list_next (e)) {
+  //   struct child_status *curr_child = list_entry (e, struct child_status, elem);
+  //   if (curr_child->childTid == tid) {
+  //     child = curr_child;
+  //     break;
+  //   }
+  // }
+  // if (child == NULL) {
+  //   return -1;
+  // }
+  sema_down(&thread_current()->load);
+  if (thread_current()->successful_load) {
+    return tid;
   }
   return -1;
 }
@@ -88,7 +93,9 @@ process_execute (const char *file_name)
 static void
 start_process (void *wrapper)
 {
-  char* file_name = (char*) wrapper;
+  struct pass_info* pass = (struct pass_info*) wrapper;
+  char* file_name = (char*) pass->file_name;
+  struct thread *parent = (struct thread*) pass->parent;
   struct intr_frame if_;
   bool success;
 
@@ -105,7 +112,7 @@ start_process (void *wrapper)
     index++;
     if (index == num_args && token != NULL) {
       printf("Too many arguments");
-      sema_up(&thread_current()->self_status->load);
+      sema_up(&parent->load);
       thread_exit();
     }
   }
@@ -118,6 +125,18 @@ start_process (void *wrapper)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (args[0], &if_.eip, &if_.esp);
+  parent->successful_load = success;
+  if (success) {
+    struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
+    status_init(s_status);
+    s_status->ref_cnt = 2;
+    s_status->childTid = 
+    thread_current() -> s_status;
+      // Add to parent
+    list_push_back(&parent->children_status, &s_status->elem);
+  }
+
+
 
   /* push args strings onto stack */
   int arg_len;
@@ -162,14 +181,13 @@ start_process (void *wrapper)
 
   /* If load failed, quit. */
   palloc_free_page (args[0]);
+  sema_up(&parent->load);
   if (!success) {
-    sema_up(&thread_current()->self_status->load);
     thread_exit();
   }
 
   // About to start execution, let parent know we are successful
-  thread_current()->self_status->successful_load = true;
-  sema_up(&thread_current()->self_status->load);
+  // thread_current()->self_status->successful_load = true;
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -204,7 +222,6 @@ process_wait (tid_t child_tid)
   }*/
   // Don't forget to malloc something
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    printf("Hello\n");
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       // sema_down(&temporary); // original code we had before
       return -1;
@@ -216,8 +233,10 @@ process_wait (tid_t child_tid)
       sema_down(&(curr_child->finished));
       curr_thread->self_status->exit_code = curr_child->exit_code;
       // Child has died and we are done, free status
-      free(curr_child);
-      return curr_child->exit_code;
+      list_remove(&curr_child->elem);
+
+      // free(curr_child);
+      return curr_thread->self_status->exit_code;
     }
   }
   return -1;
@@ -229,6 +248,44 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+    // Close executable (make available for writing)
+  // file_close(cur->executable);
+
+  struct list_elem *e;
+  struct list *children_status = &cur->children_status;
+  for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
+    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+      break;
+    }
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    lock_acquire(&(curr_child->ref_lock));
+    curr_child->ref_cnt -= 1;
+    lock_release(&(curr_child->ref_lock));
+    if (curr_child->ref_cnt == 0) {
+      // lock_release(&(curr_child->ref_lock));
+      list_remove(e);
+      free(curr_child);
+    }
+    
+  }
+
+  int a = 1;
+  int b = 2;
+  b -= a;
+  // lock_acquire(&(cur->self_status->ref_lock));
+  // cur->self_status->ref_cnt -= 1;
+  sema_up(&(cur->self_status->finished));
+  // lock_release(&(cur->self_status->ref_lock));
+  if (cur->self_status->ref_cnt == 0) {
+    free(cur->self_status);
+  }
+
+  // Free all file descriptors
+  while(!list_empty(&cur->fileDescriptorList)) {
+    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
+    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
+    free(fileD);
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -246,39 +303,6 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  // Close executable (make available for writing)
-  file_close(cur->executable);
-
-  struct list_elem *e;
-  struct list *children_status = &cur->children_status;
-  for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
-      break;
-    }
-    struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    lock_acquire(&(curr_child->ref_lock));
-    curr_child->ref_cnt -= 1;
-    if (curr_child->ref_cnt == 0) {
-      // lock_release(&(curr_child->ref_lock));
-      list_remove(e);
-      free(curr_child);
-    }
-    lock_release(&(curr_child->ref_lock));
-  }
-
-  lock_acquire(&(cur->self_status->ref_lock));
-  cur->self_status->ref_cnt -= 1;
-  sema_up(&(cur->self_status->finished));
-  if (cur->self_status->ref_cnt == 0) {
-    free(cur->self_status);
-  }
-
-  // Free all file descriptors
-  while(!list_empty(&cur->fileDescriptorList)) {
-    struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
-    struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
-    free(fileD);
-  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -480,7 +504,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // file_close (file);
   return success;
 }
 

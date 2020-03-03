@@ -10,6 +10,7 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 #include "devices/shutdown.h"
+#include "userprog/process.h"
 
 
 struct lock globalFileLock;
@@ -39,7 +40,7 @@ syscall_handler (struct intr_frame *f UNUSED)
    * include it in your final submission.
    */
 
-  /* printf("System call number: %d\n", args[0]); */
+  // printf("System call number: %d\n", args[0]);
 
   if (!is_user_vaddr(args)) { // if esp is invalid
     thread_exit();
@@ -57,7 +58,20 @@ syscall_handler (struct intr_frame *f UNUSED)
     shutdown_power_off();
     NOT_REACHED();
   } else if (args[0] == SYS_WAIT) {
-    // TODO
+    process_wait(args[1]);
+    /*tid_t child_tid = args[1];
+    struct thread *cur = thread_current();
+    struct list_elem *e;
+    struct list children_status = cur->children_status;
+    int exit_code;
+    for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
+      struct child_status *curr_child = list_entry (e, struct child_status, elem);
+      if (curr_child->childTid == child_tid) {
+        exit_code = process_wait(child_tid);
+        break;
+      }
+    }
+    f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
     // TODO
     f->eax = process_execute(args[1]);
@@ -67,6 +81,9 @@ syscall_handler (struct intr_frame *f UNUSED)
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       struct file* filePtr = filesys_open(file);
+      if (!filePtr) {
+        f->eax = -1;
+      }
       struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
       fileD->fileptr = filePtr;
       list_push_back(&t->fileDescriptorList, &fileD->fileElem);
@@ -74,7 +91,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       t->fileDesc += 1;
       lock_release(&globalFileLock);
     }
-  } else if (args[0] == SYS_CREATE) { 
+  } else if (args[0] == SYS_CREATE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
@@ -106,15 +123,16 @@ syscall_handler (struct intr_frame *f UNUSED)
     if (validate(t->pagedir, args[2])) {
       lock_acquire(&globalFileLock);
       int fd = args[1];
+      void* buffer = (void*) args[2];
+      unsigned sizeB = args[3];
       if (fd == 0) {
+        for (int i = 0; i < )
           //input_getc()
       } else {
         struct list_elem *e = list_begin(&t->fileDescriptorList);
         for (int i = 2; i < fd; i++) {
           e = list_next(e);
         }
-        void* buffer = (void*) args[2];
-        unsigned sizeB = args[3];
         struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
         off_t size = file_read(fileD->fileptr, buffer, sizeB);
         f->eax = size;
@@ -173,20 +191,5 @@ syscall_handler (struct intr_frame *f UNUSED)
     struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
     file_close(fileD->fileptr);
     lock_release(&globalFileLock);
-  }
-  if (args[0] == SYS_HALT) {
-    shutdown_power_off();
-  }
-
-  if (args[0] == SYS_EXEC) {
-    tid_t tid = process_execute(args[1]);
-  }
-
-  if (args[0] == SYS_PRACTICE) {
-    args[1] += 1; 
-  }
-
-  if (args[0] == SYS_WAIT) {
-    process_wait(args[1]);
   }
 }

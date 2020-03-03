@@ -184,6 +184,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+<<<<<<< HEAD
   /* Initialize status struct. */
   struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
   ASSERT (s_status != NULL);
@@ -201,6 +202,15 @@ thread_create (const char *name, int priority,
     lock_acquire(&t->self_status->ref_lock);
     t->self_status->ref_cnt = 2;
     lock_release(&t->self_status->ref_lock);
+=======
+  // Initialize list of children status.
+  t->children_status = (struct list *)malloc(sizeof(struct list));
+  list_init(t->children_status);
+
+  // Add to parent if possible
+  if (thread_current()->children_status != NULL) {
+    list_push_back(thread_current()->children_status, &t->self_status->elem);
+>>>>>>> fb2d953962ec89ced92d6e3182791c2c65e24004
   }
 
   /* Stack frame for kernel_thread(). */
@@ -483,6 +493,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  #ifdef USERPROG
+    list_init(&t->fileDescriptorList);
+    t->fileDesc = 2;
+  #endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

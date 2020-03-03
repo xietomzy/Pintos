@@ -92,12 +92,11 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
     struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
-    struct list children_status;      /* List of children as statuses. */
+    struct list *children_status;      /* List of children as statuses */
+    struct file *executable;          /* Executable this thread was loaded from. */
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    /* Another list_elem indicator. */
-    struct list_elem child_thread_elem; 
 
     struct semaphore load;
 
@@ -111,6 +110,11 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+  struct fileDescriptor
+    {
+      struct list_elem fileElem;
+      struct file *fileptr;
+    };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

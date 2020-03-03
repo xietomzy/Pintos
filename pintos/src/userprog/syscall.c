@@ -127,8 +127,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       void* buffer = (void*) args[2];
       unsigned sizeB = args[3];
       if (fd == 0) {
-        // for (int i = 0; i < )
-          //input_getc()
+          uint8_t *input = (uint8_t *) buffer; // stdin
+          int bytes_read = 0;
+          while (bytes_read < size) {
+            input[bytes_read] = input_getc();
+            if (input[bytes_read + 1] == '\n') {
+              break;
+            }
+          }
+          f->eax = bytes_read;
       } else {
         struct list_elem *e = list_begin(&t->fileDescriptorList);
         for (int i = 2; i < fd; i++) {

@@ -75,10 +75,11 @@ process_execute (const char *file_name)
     }
   }
   if (child == NULL) {
-      sema_down(&child->load);
-      if (child->successful_load) {
-        return tid;
-      }
+    return -1;
+  }
+  sema_down(&child->load);
+  if (child->successful_load) {
+    return tid;
   }
   return -1;
 }
@@ -194,7 +195,7 @@ int
 process_wait (tid_t child_tid)
 {
   //sema_down(&temporary);
-  // return 0;
+  return 0;
   struct thread *curr_thread = thread_current();
   struct list *children_status = &curr_thread->children_status;
   struct list_elem *e;
@@ -204,7 +205,6 @@ process_wait (tid_t child_tid)
   }*/
   // Don't forget to malloc something
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    printf("Hello\n");
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       // sema_down(&temporary); // original code we had before
       return -1;

@@ -28,10 +28,10 @@ struct thread get_child(tid_t tid);
 /* Wraps a file name and child_status struct for use in the child process
    created by process_execute. Note that main and idle will therefore
    inherently lack a child_status struct. */
-struct child_info {
-  char *file_name;
-  struct child_status *status;
-};
+// struct child_info {
+//   char *file_name;
+//   struct child_status *status;
+// };
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -58,30 +58,29 @@ process_execute (const char *file_name)
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
 
-  /* Initialize status struct. */
-  struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
-  ASSERT (s_status != NULL);
-  status_init(s_status);
-  s_status->successful_load = false;
-  s_status->ref_cnt = 1;
-
-  // Create wrapper struct
-  struct child_info *wrapper = (struct child_info *)malloc(sizeof(struct child_info));
-  wrapper->file_name = fn_copy;
-  wrapper->status = s_status;
-
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, (void *)wrapper);
-
-  // Wait for thread to load
-  sema_down(&s_status->load);
-  if (tid == TID_ERROR || !s_status->successful_load) {
+  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
-    free((void *)s_status);
     return TID_ERROR;
   }
-
-  return tid;
+  struct child_status *child = NULL;
+  struct list *children = &thread_current()->children_status;
+  struct list_elem *e;
+  for (e = list_begin (children); e != list_end (children); e = list_next (e)) {
+    struct child_status *curr_child = list_entry (e, struct child_status, elem);
+    if (curr_child->childTid == tid) {
+      child = curr_child;
+      break;
+    }
+  }
+  if (child == NULL) {
+      sema_down(&child->load);
+      if (child->successful_load) {
+        return tid;
+      }
+  }
+  return -1;
 }
 
 /* A thread function that loads a user process and starts it
@@ -89,10 +88,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *wrapper)
 {
-  struct child_info *child_info = (struct child_info *)wrapper;
-  char *file_name = child_info->file_name;
-  thread_current()->self_status = child_info->status;
-  free(wrapper);
+  char* file_name = (char*) wrapper;
   struct intr_frame if_;
   bool success;
 
@@ -198,9 +194,9 @@ int
 process_wait (tid_t child_tid)
 {
   //sema_down(&temporary);
-  return 0;
+  // return 0;
   struct thread *curr_thread = thread_current();
-  struct list *children_status = curr_thread->children_status;
+  struct list *children_status = &curr_thread->children_status;
   struct list_elem *e;
   /*if (list_empty(&children_status)) {
     printf("%d", list_empty(&children_status));
@@ -208,9 +204,10 @@ process_wait (tid_t child_tid)
   }*/
   // Don't forget to malloc something
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
+    printf("Hello\n");
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       // sema_down(&temporary); // original code we had before
-      return 0;
+      return -1;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
 
@@ -253,7 +250,7 @@ process_exit (void)
   file_close(cur->executable);
 
   struct list_elem *e;
-  struct list *children_status = cur->children_status;
+  struct list *children_status = &cur->children_status;
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       break;
@@ -271,12 +268,9 @@ process_exit (void)
 
   lock_acquire(&(cur->self_status->ref_lock));
   cur->self_status->ref_cnt -= 1;
+  sema_up(&(cur->self_status->finished));
   if (cur->self_status->ref_cnt == 0) {
-    lock_release(&(cur->self_status->ref_lock));
     free(cur->self_status);
-  } else {
-    sema_up(&(cur->self_status->finished));
-    lock_release(&(cur->self_status->ref_lock));
   }
 
   // Free all file descriptors
@@ -486,7 +480,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  //file_close (file);
+  file_close (file);
   return success;
 }
 

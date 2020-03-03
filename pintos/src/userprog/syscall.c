@@ -83,12 +83,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       struct file* filePtr = filesys_open(file);
       if (!filePtr) {
         f->eax = -1;
+      } else {
+        struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
+        fileD->fileptr = filePtr;
+        list_push_back(&t->fileDescriptorList, &fileD->fileElem);
+        f->eax = t->fileDesc;
+        t->fileDesc += 1;
       }
-      struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
-      fileD->fileptr = filePtr;
-      list_push_back(&t->fileDescriptorList, &fileD->fileElem);
-      f->eax = t->fileDesc;
-      t->fileDesc += 1;
       lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_CREATE) {
@@ -126,7 +127,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       void* buffer = (void*) args[2];
       unsigned sizeB = args[3];
       if (fd == 0) {
-        for (int i = 0; i < )
+        // for (int i = 0; i < )
           //input_getc()
       } else {
         struct list_elem *e = list_begin(&t->fileDescriptorList);

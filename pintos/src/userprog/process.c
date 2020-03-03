@@ -198,9 +198,9 @@ int
 process_wait (tid_t child_tid)
 {
   //sema_down(&temporary);
-  return 0;
+  // return 0;
   struct thread *curr_thread = thread_current();
-  struct list *children_status = curr_thread->children_status;
+  struct list *children_status = &curr_thread->children_status;
   struct list_elem *e;
   /*if (list_empty(&children_status)) {
     printf("%d", list_empty(&children_status));
@@ -208,9 +208,10 @@ process_wait (tid_t child_tid)
   }*/
   // Don't forget to malloc something
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
+    printf("Hello\n");
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       // sema_down(&temporary); // original code we had before
-      return 0;
+      return -1;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
 
@@ -253,7 +254,7 @@ process_exit (void)
   file_close(cur->executable);
 
   struct list_elem *e;
-  struct list *children_status = cur->children_status;
+  struct list *children_status = &cur->children_status;
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
     if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       break;
@@ -271,12 +272,9 @@ process_exit (void)
 
   lock_acquire(&(cur->self_status->ref_lock));
   cur->self_status->ref_cnt -= 1;
+  sema_up(&(cur->self_status->finished));
   if (cur->self_status->ref_cnt == 0) {
-    lock_release(&(cur->self_status->ref_lock));
     free(cur->self_status);
-  } else {
-    sema_up(&(cur->self_status->finished));
-    lock_release(&(cur->self_status->ref_lock));
   }
 
   // Free all file descriptors
@@ -486,7 +484,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  //file_close (file);
+  file_close (file);
   return success;
 }
 

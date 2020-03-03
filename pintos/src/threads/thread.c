@@ -99,6 +99,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  // Initialize list of children status.
+  list_init(&initial_thread->children_status);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -184,14 +187,8 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  // Initialize list of children status.
-  t->children_status = (struct list *)malloc(sizeof(struct list));
-  list_init(t->children_status);
-
-  // Add to parent if possible
-  if (thread_current()->children_status != NULL) {
-    list_push_back(thread_current()->children_status, &t->self_status->elem);
-  }
+  // Add to parent
+  list_push_back(&thread_current()->children_status, &t->self_status->elem);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -475,7 +472,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   #ifdef USERPROG
     list_init(&t->fileDescriptorList);
-    t->fileDesc = 2;
+    t->fileDesc = 3;
   #endif
 
   old_level = intr_disable ();

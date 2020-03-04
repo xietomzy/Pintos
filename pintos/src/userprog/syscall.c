@@ -257,7 +257,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     if (fd >= t->fileDesc || fd < 0) {
       f->eax = -1;
     } else {
-      for (int i = 2; i < fd - 1; i++) {
+      for (int i = 2; i < fd; i++) {
         e = list_next(e);
       }
       struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);

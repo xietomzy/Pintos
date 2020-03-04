@@ -217,7 +217,8 @@ process_wait (tid_t child_tid)
       int exit_code = curr_child->exit_code;
       // Child has died and we are done, free status
       list_remove(&curr_child->elem);
-      free(curr_child);
+      if (curr_child->ref_cnt == 0)
+        free(curr_child);
       return exit_code;
     }
   }

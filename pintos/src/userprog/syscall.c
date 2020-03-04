@@ -25,7 +25,15 @@ syscall_init (void)
 }
 
 static bool validate(uint32_t *pd, const void* ptr) {
-  return ptr != NULL && is_user_vaddr(ptr) != NULL && pagedir_get_page(pd, ptr) != NULL;
+  bool result;
+  for (int i = 0; i < 4; i++) { // check each byte of ptr
+    result = ptr != NULL && is_user_vaddr(ptr) != NULL && pagedir_get_page(pd, ptr) != NULL && ptr + 4 < PHYS_BASE;
+    if (!result) {
+      return false;
+    }
+  }
+  return result;
+  
 }
 
 static void
@@ -48,9 +56,14 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   struct thread *t = thread_current();
   if (args[0] == SYS_EXIT) {
-    f->eax = args[1];
-    printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
-    thread_exit ();
+     f->eax = args[1];
+     if(!is_user_vaddr(&args[1])) {
+        thread_current()->self_status->exit_code = -1;
+        thread_exit();
+    } else {
+        thread_current()->self_status->exit_code = args[1];
+        thread_exit();
+    }
   } else if (args[0] == SYS_PRACTICE) {
     f->eax = args[1] + 1;
     return;
@@ -58,7 +71,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     shutdown_power_off();
     NOT_REACHED();
   } else if (args[0] == SYS_WAIT) {
-    process_wait(args[1]);
+    int wait = process_wait(args[1]);
+    f->eax = wait;
     /*tid_t child_tid = args[1];
     struct thread *cur = thread_current();
     struct list_elem *e;
@@ -73,7 +87,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
-    // TODO
     f->eax = process_execute(args[1]);
     return;
   } else if (args[0] == SYS_OPEN) {
@@ -92,6 +105,9 @@ syscall_handler (struct intr_frame *f UNUSED)
         t->fileDesc += 1;
       }
       lock_release(&globalFileLock);
+    } else {
+      f->eax = -1;
+      thread_exit();
     }
   } else if (args[0] == SYS_CREATE) {
     const char* file = (char*) args[1];
@@ -99,10 +115,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       lock_acquire(&globalFileLock);
       unsigned size = args[2];
       bool success = filesys_create(file, size);
-      f->eax = !success;
+      f->eax = success;
       lock_release(&globalFileLock);
+    } else {
+      f->eax = -1;
+      thread_exit();
     }
-    f->eax = -1;
+
   } else if (args[0] == SYS_REMOVE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -110,8 +129,10 @@ syscall_handler (struct intr_frame *f UNUSED)
       bool success = filesys_remove(file);
       f->eax = success;
       lock_release(&globalFileLock);
+    } else {
+      f->eax = -1;
     }
-    f->eax = -1;
+
   } else if (args[0] == SYS_FILESIZE) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin (&t->fileDescriptorList);
@@ -139,6 +160,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       unsigned sizeB = args[3];
       if (fd >= t->fileDesc || fd < 0) {
         f->eax = -1;
+        thread_exit();
       } else {
         if (fd == 0) {
             uint8_t *input = (uint8_t *) buffer; // stdin
@@ -162,9 +184,9 @@ syscall_handler (struct intr_frame *f UNUSED)
             off_t size = file_read(fileD->fileptr, buffer, sizeB);
             f->eax = size;
           }
-          lock_release(&globalFileLock);
         }
       }
+      lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_WRITE) {
     if (validate(t->pagedir, args[2])) {
@@ -192,6 +214,9 @@ syscall_handler (struct intr_frame *f UNUSED)
         }
       }
       lock_release(&globalFileLock);
+    } else {
+      f->eax = -1;
+      thread_exit();
     }
   } else if (args[0] == SYS_SEEK) {
     lock_acquire(&globalFileLock);

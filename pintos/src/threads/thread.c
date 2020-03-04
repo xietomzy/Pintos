@@ -96,9 +96,6 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-
-  // // Initialize list of children status.
-  // list_init(&initial_thread->children_status);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -181,18 +178,6 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
-  struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
-  ASSERT (s_status != NULL);
-  status_init(s_status);
-  s_status->successful_load = false;
-  s_status->childTid = tid;
-  s_status->ref_cnt = 2;
-  s_status->exit_code = -1;
-  t->self_status = s_status;
-
-  // Add to parent
-  list_push_back(&thread_current()->children_status, &s_status->elem);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);

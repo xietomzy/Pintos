@@ -131,12 +131,12 @@ start_process (void *wrapper)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (args[0], &if_.eip, &if_.esp);
 
-  if (!success) {
+  /*if (!success) {
     palloc_free_page (args[0]);
     sema_up(&thread_current()->self_status->load);
     thread_exit();
     return;
-  }
+  }*/
   /* push args strings onto stack */
   int arg_len;
   int arg_addrs[argc];
@@ -181,9 +181,9 @@ start_process (void *wrapper)
   /* If load failed, quit. */
   palloc_free_page (args[0]);
   sema_up(&thread_current()->self_status->load);
-  /*if (!success) {
+  if (!success) {
     thread_exit();
-  }*/
+  }
 
   // Successful load, increment ref_cnt before waking up parent
   lock_acquire(&thread_current()->self_status->ref_lock);

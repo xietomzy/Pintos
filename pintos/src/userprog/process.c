@@ -120,6 +120,12 @@ start_process (void *wrapper)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (args[0], &if_.eip, &if_.esp);
 
+  if (!success) {
+    palloc_free_page (args[0]);
+    sema_up(&thread_current()->self_status->load);
+    thread_exit();
+    return;
+  }
   /* push args strings onto stack */
   int arg_len;
   int arg_addrs[argc];
@@ -164,9 +170,9 @@ start_process (void *wrapper)
   /* If load failed, quit. */
   palloc_free_page (args[0]);
   sema_up(&thread_current()->self_status->load);
-  if (!success) {
+  /*if (!success) {
     thread_exit();
-  }
+  }*/
 
   // About to start execution, let parent know we are successful
   thread_current()->self_status->successful_load = true;
@@ -239,9 +245,9 @@ process_exit (void)
   struct list_elem *e;
   struct list *children_status = &cur->children_status;
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+    /*if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
       break;
-    }
+    }*/
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
     lock_acquire(&(curr_child->ref_lock));
     curr_child->ref_cnt -= 1;

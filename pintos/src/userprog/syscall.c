@@ -95,12 +95,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       thread_exit();
     }
   } else if (args[0] == SYS_OPEN) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, &args[1]) || validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       struct file* filePtr = filesys_open(file);
       if (!filePtr) {
         f->eax = -1;
+        thread_exit();
       } else {
         struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
         fileD->fileptr = filePtr;

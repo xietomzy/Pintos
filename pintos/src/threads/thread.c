@@ -187,12 +187,6 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-<<<<<<< HEAD
-  // Initialize list of children status.
-  list_init(&t->children_status);
-
-=======
->>>>>>> 0318e6eabff2f170d44081f21329dbda9da3c711
   // Add to parent
   list_push_back(&thread_current()->children_status, &t->self_status->elem);
 

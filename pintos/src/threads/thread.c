@@ -99,6 +99,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  // Initialize list of children status.
+  list_init(&initial_thread->children_status);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -184,9 +187,12 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+<<<<<<< HEAD
   // Initialize list of children status.
   list_init(&t->children_status);
 
+=======
+>>>>>>> 0318e6eabff2f170d44081f21329dbda9da3c711
   // Add to parent
   list_push_back(&thread_current()->children_status, &t->self_status->elem);
 

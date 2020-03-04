@@ -22,9 +22,12 @@ However, we did add a few changes.
 Task 2 remained relatively the same.  
 
 1. We had a struct from the design doc to learn more things about children threads, but we had to add more members.
-a. We had to add a semaphore called "load" that informs the parent process when the child has been loaded. This is important because in process_execute, when we call thread_create, we have to wait for the thread to actually create, because process_execute might return before thread_create finishes creating a thread.
-b. We have a new boolean member called "successful load," used to indicate whether the child thread has been successfull loaded in process_execute.  This is important because we need to distinguish whether the child thread successfully creates or not.
-c. A new lock member called "ref_lock", which is a lock that must be acquired in order to modify the ref_count of a thread.  There may exist race conditions when a thread's ref_count needs to be changed.
+
+1a. We had to add a semaphore called "load" that informs the parent process when the child has been loaded. This is important because in process_execute, when we call thread_create, we have to wait for the thread to actually create, because process_execute might return before thread_create finishes creating a thread.
+
+1b. We have a new boolean member called "successful load," used to indicate whether the child thread has been successfull loaded in process_execute.  This is important because we need to distinguish whether the child thread successfully creates or not.
+
+1c. A new lock member called "ref_lock", which is a lock that must be acquired in order to modify the ref_count of a thread.  There may exist race conditions when a thread's ref_count needs to be changed.
 
 
 

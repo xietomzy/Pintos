@@ -217,7 +217,8 @@ process_wait (tid_t child_tid)
       int exit_code = curr_child->exit_code;
       // Child has died and we are done, free status
       list_remove(&curr_child->elem);
-      free(curr_child);
+      if (curr_child->ref_cnt == 0)
+        free(curr_child);
       return exit_code;
     }
   }
@@ -255,7 +256,6 @@ process_exit (void)
   lock_acquire(&(cur->self_status->ref_lock));
   cur->self_status->ref_cnt -= 1;
   lock_release(&(cur->self_status->ref_lock));
-  cur->self_status->exit_code = 0;
   sema_up(&(cur->self_status->finished));
   if (cur->self_status->ref_cnt == 0) {
     free(cur->self_status);

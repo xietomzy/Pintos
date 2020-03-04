@@ -87,7 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, &args[1]) && validate(t->pagedir, args[1])) {
       f->eax = process_execute(args[1]);
       return;
     } else {

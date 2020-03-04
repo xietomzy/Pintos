@@ -254,14 +254,13 @@ process_exit (void)
   struct list_elem *e;
   struct list *children_status = &cur->children_status;
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+    if (e->next == NULL) { 
       break;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
     lock_acquire(&(curr_child->ref_lock));
     curr_child->ref_cnt -= 1;
     if (curr_child->ref_cnt == 0) {
-      // lock_release(&(curr_child->ref_lock));
       list_remove(e);
       lock_release(&(curr_child->ref_lock));
       free(curr_child);
@@ -285,7 +284,8 @@ process_exit (void)
     file_close(fileD->fileptr);
     free(fileD);
   }
-  printf("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
+
+  printf("%s: exit(%d)\n", (char*) &(thread_current ()->name), thread_current()->self_status->exit_code);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -354,6 +354,7 @@ struct Elf32_Ehdr
     Elf32_Half    e_shnum;
     Elf32_Half    e_shstrndx;
   };
+
 
 /* Program header.  See [ELF1] 2-2 to 2-4.
    There are e_phnum of these, starting at file offset e_phoff

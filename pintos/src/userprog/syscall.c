@@ -11,6 +11,7 @@
 #include "filesys/file.h"
 #include "devices/shutdown.h"
 #include "userprog/process.h"
+#include "devices/input.h"
 
 
 struct lock globalFileLock;
@@ -74,15 +75,15 @@ syscall_handler (struct intr_frame *f UNUSED)
     int wait = process_wait(args[1]);
     f->eax = wait;
   } else if (args[0] == SYS_EXEC) {
-    if (validate(t->pagedir, &args[1]) && validate(t->pagedir, args[1])) {
-      f->eax = process_execute(args[1]);
+    if (validate(t->pagedir, &args[1]) && validate(t->pagedir, (void*) args[1])) {
+      f->eax = process_execute((char *) args[1]);
       return;
     } else {
       f->eax = -1;
       thread_exit();
     }
   } else if (args[0] == SYS_OPEN) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, (void *) args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       struct file* filePtr = filesys_open(file);
@@ -115,7 +116,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
 
   } else if (args[0] == SYS_REMOVE) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, (void *)args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       bool success = filesys_remove(file);
@@ -145,7 +146,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_READ) {
-    if (validate(t->pagedir, args[2])) {
+    if (validate(t->pagedir, (void *) args[2])) {
       lock_acquire(&globalFileLock);
       int fd = args[1];
       void* buffer = (void*) args[2];
@@ -157,7 +158,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         if (fd == 0) {
             uint8_t *input = (uint8_t *) buffer; // stdin
             int bytes_read = 0;
-            while (bytes_read < sizeB) {
+            while ((int) bytes_read < (int) sizeB) {
               input[bytes_read] = input_getc();
               if (input[bytes_read + 1] == '\n') {
                 break;
@@ -184,10 +185,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       thread_exit();
     }
   } else if (args[0] == SYS_WRITE) {
-    if (validate(t->pagedir, args[2])) {
+    if (validate(t->pagedir, (void *) args[2])) {
       int fd = args[1];
-      const void* buffer = (void*) args[2];
-      unsigned sizeB = args[3];
       if (fd >= t->fileDesc || fd < 0) {
         f->eax = -1;
       } else {

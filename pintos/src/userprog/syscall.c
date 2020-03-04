@@ -10,6 +10,7 @@
 #include "userprog/pagedir.h"
 #include "filesys/file.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "userprog/process.h"
 
 
@@ -27,13 +28,13 @@ syscall_init (void)
 static bool validate(uint32_t *pd, const void* ptr) {
   bool result;
   for (int i = 0; i < 4; i++) { // check each byte of ptr
-    result = ptr + i != NULL && is_user_vaddr(ptr + i) != NULL && pagedir_get_page(pd, ptr + i) != NULL && ptr + i + 4 < PHYS_BASE;
+    result = ptr + i != NULL && is_user_vaddr(ptr + i) && pagedir_get_page(pd, ptr + i) != NULL && ptr + i + 4 < PHYS_BASE;
     if (!result) {
       return false;
     }
   }
   return result;
-  
+
 }
 
 static void
@@ -73,29 +74,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   } else if (args[0] == SYS_WAIT) {
     int wait = process_wait(args[1]);
     f->eax = wait;
-    /*tid_t child_tid = args[1];
-    struct thread *cur = thread_current();
-    struct list_elem *e;
-    struct list children_status = cur->children_status;
-    int exit_code;
-    for (e = list_begin(&children_status); e != list_end(&children_status); e = list_next(e)) {
-      struct child_status *curr_child = list_entry (e, struct child_status, elem);
-      if (curr_child->childTid == child_tid) {
-        exit_code = process_wait(child_tid);
-        break;
-      }
-    }
-    f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
-    if (validate(t->pagedir, &args[1]) && validate(t->pagedir, args[1])) {
-      f->eax = process_execute(args[1]);
+    if (validate(t->pagedir, &args[1]) && validate(t->pagedir, (void *)args[1])) {
+      f->eax = process_execute((char *)args[1]);
       return;
     } else {
       f->eax = -1;
       thread_exit();
     }
   } else if (args[0] == SYS_OPEN) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, (void *)args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       struct file* filePtr = filesys_open(file);
@@ -128,7 +116,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
 
   } else if (args[0] == SYS_REMOVE) {
-    if (validate(t->pagedir, args[1])) {
+    if (validate(t->pagedir, (void *)args[1])) {
       lock_acquire(&globalFileLock);
       const char* file = (char*) args[1];
       bool success = filesys_remove(file);
@@ -158,7 +146,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_READ) {
-    if (validate(t->pagedir, args[2])) {
+    if (validate(t->pagedir, (void *)args[2])) {
       lock_acquire(&globalFileLock);
       int fd = args[1];
       void* buffer = (void*) args[2];
@@ -169,7 +157,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       } else {
         if (fd == 0) {
             uint8_t *input = (uint8_t *) buffer; // stdin
-            int bytes_read = 0;
+            unsigned bytes_read = 0;
             while (bytes_read < sizeB) {
               input[bytes_read] = input_getc();
               if (input[bytes_read + 1] == '\n') {
@@ -197,10 +185,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       thread_exit();
     }
   } else if (args[0] == SYS_WRITE) {
-    if (validate(t->pagedir, args[2])) {
+    if (validate(t->pagedir, (void *)args[2])) {
       int fd = args[1];
-      const void* buffer = (void*) args[2];
-      unsigned sizeB = args[3];
       if (fd >= t->fileDesc || fd < 0) {
         f->eax = -1;
       } else {
@@ -274,7 +260,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         e = list_next(e);
       }
       struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-          
+
       if (fileD->fd != fd) {
         f->eax = -1;
       } else {

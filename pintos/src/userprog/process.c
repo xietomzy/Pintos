@@ -231,8 +231,10 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  if (cur->self_status->executable != NULL) {
+    file_close(cur->self_status->executable);
+  }   
 
-  file_close(cur->executable);
 
   struct list_elem *e;
   struct list *children_status = &cur->children_status;
@@ -265,8 +267,10 @@ process_exit (void)
   while(!list_empty(&cur->fileDescriptorList)) {
     struct list_elem* elmt = list_pop_back(&cur->fileDescriptorList);
     struct fileDescriptor* fileD = list_entry(elmt, struct fileDescriptor, fileElem);
+    file_close(fileD->fileptr);
     free(fileD);
   }
+  printf("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -394,15 +398,12 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
+  t->self_status->executable = file;
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
       goto done;
     }
-
-  t->executable = file;
-  file_deny_write(file);
-
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -486,6 +487,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
+  if (file != NULL) {
+    file_deny_write(file);
+  }
   return success;
 }
 

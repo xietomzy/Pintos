@@ -198,7 +198,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
   } else if (args[0] == SYS_WRITE) {
     if (validate(t->pagedir, args[2])) {
-      lock_acquire(&globalFileLock);
       int fd = args[1];
       const void* buffer = (void*) args[2];
       unsigned sizeB = args[3];
@@ -206,7 +205,7 @@ syscall_handler (struct intr_frame *f UNUSED)
         f->eax = -1;
       } else {
         if (fd == 1) {
-          putbuf(buffer, sizeB);
+	        putbuf((void*)args[2], args[3]);
         } else {
           struct list_elem *e = list_begin(&t->fileDescriptorList);
           for (int i = 2; i < fd - 1; i++) {
@@ -216,12 +215,12 @@ syscall_handler (struct intr_frame *f UNUSED)
           if (fileD->fd != fd) {
             f->eax = -1;
           } else {
-            off_t size = file_write(fileD->fileptr, buffer, sizeB);
-            f->eax = size;
+            lock_acquire(&globalFileLock);
+            f->eax = file_write(fileD->fileptr, (void*) args[2], args[3]);
+            lock_release(&globalFileLock);
           }
         }
       }
-      lock_release(&globalFileLock);
     } else {
       f->eax = -1;
       thread_exit();

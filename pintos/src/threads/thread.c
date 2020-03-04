@@ -473,6 +473,7 @@ init_thread (struct thread *t, const char *name, int priority)
     list_init(&t->fileDescriptorList);
     list_init(&t->children_status);
     t->fileDesc = 3;
+        sema_init(&t->load, 0);
   #endif
 
   old_level = intr_disable ();

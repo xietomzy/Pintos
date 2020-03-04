@@ -28,10 +28,10 @@ struct thread get_child(tid_t tid);
 /* Wraps a file name and child_status struct for use in the child process
    created by process_execute. Note that main and idle will therefore
    inherently lack a child_status struct. */
-// struct child_info {
-//   char *file_name;
-//   struct child_status *status;
-// };
+struct pass_info {
+  char *file_name;
+  struct thread *parent;
+};
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -57,31 +57,36 @@ process_execute (const char *file_name)
   strlcpy (buffer, fn_copy, strlen(fn_copy) + 1);
   char *saveptr;
   char *token = strtok_r(buffer, " ", &saveptr); // get filename (first string arg)
+  struct pass_info* pass = malloc(sizeof(struct pass_info));
+  pass->parent = thread_current();
+  pass->file_name = fn_copy;
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (token, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (token, PRI_DEFAULT, start_process, pass);
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy);
     return TID_ERROR;
   }
-  struct child_status *child = NULL;
-  struct list *children = &thread_current()->children_status;
-  struct list_elem *e;
-  for (e = list_begin (children); e != list_end (children); e = list_next (e)) {
-    struct child_status *curr_child = list_entry (e, struct child_status, elem);
-    if (curr_child->childTid == tid) {
-      child = curr_child;
-      break;
-    }
-  }
-  if (child == NULL) {
-    return -1;
-  }
-  sema_down(&child->load);
-  if (child->successful_load) {
+  // struct child_status *child = NULL;
+  // struct list *children = &thread_current()->children_status;
+  // struct list_elem *e;
+  // for (e = list_begin (children); e != list_end (children); e = list_next (e)) {
+  //   struct child_status *curr_child = list_entry (e, struct child_status, elem);
+  //   if (curr_child->childTid == tid) {
+  //     child = curr_child;
+  //     break;
+  //   }
+  // }
+  sema_down(&thread_current()->load);
+  if (thread_current()->successful_load) {
     return tid;
   }
   return -1;
+  // if (child == NULL || !child->successful_load) {
+  //   return -1;
+  // } else {
+  //   return tid;
+  // }
 }
 
 /* A thread function that loads a user process and starts it
@@ -89,7 +94,9 @@ process_execute (const char *file_name)
 static void
 start_process (void *wrapper)
 {
-  char* file_name = (char*) wrapper;
+  struct pass_info* pass = (struct pass_info*) wrapper;
+  struct thread* parent = pass->parent;
+  char* file_name = (char*) pass->file_name;
   struct intr_frame if_;
   bool success;
 
@@ -106,7 +113,7 @@ start_process (void *wrapper)
     index++;
     if (index == num_args && token != NULL) {
       printf("Too many arguments");
-      sema_up(&thread_current()->self_status->load);
+      sema_up(&parent->load);
       thread_exit();
     }
   }
@@ -163,13 +170,13 @@ start_process (void *wrapper)
 
   /* If load failed, quit. */
   palloc_free_page (args[0]);
-  sema_up(&thread_current()->self_status->load);
+  sema_up(&parent->load);
   if (!success) {
     thread_exit();
   }
 
   // About to start execution, let parent know we are successful
-  thread_current()->self_status->successful_load = true;
+  parent->successful_load = true;
 
 
   /* Start the user process by simulating a return from an

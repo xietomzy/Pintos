@@ -19,7 +19,9 @@ However, we did add a few changes.
 
 ### 2.2 Task 2: Process Control Syscalls
 
-Task 2 remained relatively the same.  
+Task 2 remained relatively the same, but some changes had to happen to our data structures.
+
+#### The child_status struct.
 
 1. We had a struct from the design doc to learn more things about children threads, but we had to add more members. We had to add a semaphore called "load" that informs the parent process when the child has been loaded. This is important because in process_execute, when we call thread_create, we have to wait for the thread to actually create, because process_execute might return before thread_create finishes creating a thread.
 

@@ -27,7 +27,7 @@ syscall_init (void)
 static bool validate(uint32_t *pd, const void* ptr) {
   bool result;
   for (int i = 0; i < 4; i++) { // check each byte of ptr
-    result = ptr != NULL && is_user_vaddr(ptr) != NULL && pagedir_get_page(pd, ptr) != NULL && ptr + 4 < PHYS_BASE;
+    result = ptr + i != NULL && is_user_vaddr(ptr + i) != NULL && pagedir_get_page(pd, ptr + i) != NULL && ptr + i + 4 < PHYS_BASE;
     if (!result) {
       return false;
     }
@@ -50,11 +50,11 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   // printf("System call number: %d\n", args[0]);
 
-  if (!is_user_vaddr(args)) { // if esp is invalid
+  struct thread *t = thread_current();
+  if (!validate(t->pagedir, args)) { // if esp is invalid
     thread_exit();
   }
 
-  struct thread *t = thread_current();
   if (args[0] == SYS_EXIT) {
      f->eax = args[1];
      if(!is_user_vaddr(&args[1])) {
@@ -87,8 +87,13 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     f->eax = exit_code;*/
   } else if (args[0] == SYS_EXEC) {
-    f->eax = process_execute(args[1]);
-    return;
+    if (validate(t->pagedir, args[1])) {
+      f->eax = process_execute(args[1]);
+      return;
+    } else {
+      f->eax = -1;
+      thread_exit();
+    }
   } else if (args[0] == SYS_OPEN) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -187,6 +192,9 @@ syscall_handler (struct intr_frame *f UNUSED)
         }
       }
       lock_release(&globalFileLock);
+    } else {
+      f->eax = -1;
+      thread_exit();
     }
   } else if (args[0] == SYS_WRITE) {
     if (validate(t->pagedir, args[2])) {

@@ -129,17 +129,13 @@ start_process (void *wrapper)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (args[0], &if_.eip, &if_.esp);
-
-<<<<<<< HEAD
-  /*if (!success) {
-    palloc_free_page (args[0]);
+  success = load (file_name, &if_.eip, &if_.esp);
+  printf("%d\n", success);
+  if (!success) {
+    thread_current()->self_status->successful_load = success;
     sema_up(&thread_current()->self_status->load);
     thread_exit();
-    return;
-  }*/
-=======
->>>>>>> db404481076ef789615a3a7ad052e1ce66c1e994
+  } else {
   /* push args strings onto stack */
   int arg_len;
   int arg_addrs[argc];
@@ -194,7 +190,7 @@ start_process (void *wrapper)
   lock_release(&thread_current()->self_status->ref_lock);
 
   // About to start execution, let parent know we are successful
-  thread_current()->self_status->successful_load = true;
+  thread_current()->self_status->successful_load = success;
   sema_up(&thread_current()->self_status->load);
 
 
@@ -206,6 +202,7 @@ start_process (void *wrapper)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
+  }
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -263,7 +260,7 @@ process_exit (void)
   struct list_elem *e;
   struct list *children_status = &cur->children_status;
   for (e = list_begin(children_status); e != list_end(children_status); e = list_next(e)) {
-    if (e->next == NULL) { // just skips the for loop altogether bc list_next is not working
+    if (e == NULL) { // just skips the for loop altogether bc list_next is not working
       break;
     }
     struct child_status *curr_child = list_entry (e, struct child_status, elem);
@@ -294,7 +291,7 @@ process_exit (void)
     file_close(fileD->fileptr);
     free(fileD);
   }
-  printf("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
+  //printf("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

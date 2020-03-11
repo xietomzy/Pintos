@@ -10,6 +10,14 @@ Design Document for Project 2: Threads
 
 Replace this text with your design document.
 
+## Task 2: Priority Scheduler
+
+### Data structures and functions
+
+
+
+### Algorithms
+
 ## 2.1.2 Design Document Additional Questions
 
 1. In class, we studied the three most important attributes of a thread that the operating system

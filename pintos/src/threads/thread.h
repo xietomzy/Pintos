@@ -151,8 +151,8 @@ struct child_status {
     int ref_cnt;                /*Number of threads watching this status.*/
     tid_t childTid;             /*Child thread ID*/
     int exit_code;              /*Child exit code*/
-    struct semaphore finished; /*0 = child running, 1 = child finished*/
-    struct file *executable;          /* Executable this thread was loaded from. */
+    struct semaphore finished;  /*0 = child running, 1 = child finished*/
+    struct file *executable;    /* Executable this thread was loaded from. */
 };
 
 // Initiate child_status struct for this thread

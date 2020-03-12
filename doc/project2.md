@@ -22,7 +22,7 @@ which is explained in Algorithms.
 
 ### Algorithms:
 ### timer.c
-In `timer_sleep`, we will first validate that `ticks` is indeed greater than zero, returning if this is not the case. Then, instead of spinning in a circle in `timer_sleep`, we will instead set the thread's `sleepTicks` to the passed in value. Finally, we will call `thread_block` to put ourselves to sleep. The reason we do not need to acquire a lock to modify sleepTicks is explained in **Syncronization**. 
+In `timer_sleep`, we will first validate that `ticks` is indeed greater than zero, returning if this is not the case. Then, instead of spinning in a circle in `timer_sleep`, we will instead set the thread's `sleepTicks` to the passed in value. Finally, we will call `thread_block` to put ourselves to sleep. The reason we do not need to acquire a lock to modify `sleepTicks` is explained in **Synchronization**. 
 
 ### thread.c
 `sleep_handler` will do the following for each thread:
@@ -32,10 +32,10 @@ In `timer_sleep`, we will first validate that `ticks` is indeed greater than zer
 `sleep_handler` will be called on all threads in `thread_schedule_tail` using `thread_foreach`.
 
 ### Synchronization:
-It may be surprising that we chose not to use a lock or any other synchronizations primitives for protection against concurrency issues for sleepTicks. The rationale is explained below.
+It may be surprising that we chose not to use a lock or any other synchronizations primitives for protection against concurrency issues for `sleepTicks`. The rationale is explained below.
 
 ### Rationale: 
-We found it unecessary to include a lock (or any other synchronization construct) for the following reasons:
+We found it unnecessary to include a lock (or any other synchronization construct) for the following reasons:
 - The lock would need to be acquired every tick, adding overhead to thread management
 - Mistakes in having the lock being held by sleeping threads while interrupts are disabled would result in problems
 - Most importantly, since only one thread can decrement the value, and it is not interruptible when it happens, with the only other modification occurring at the initial set, it is not possible for concurrency bugs to occur.
@@ -47,7 +47,7 @@ To begin, we must find a way to sort the `ready_list` by priority. One way to ac
 ```c
 list_less_func compare_priority(thread a , thread b) 
 ```
-We would pass this comparator into the list functions, such as `list_sort` and `list_insert_ordered`. However, since these list functions are not thread-safe, we need to use a lock for everytime we modify the list. 
+We would pass this comparator into the list functions, such as `list_sort` and `list_insert_ordered`. However, since these list functions are not thread-safe, we need to use a lock for every time we modify the list. 
 ```c
 struct lock ready_list_lock;
 ```

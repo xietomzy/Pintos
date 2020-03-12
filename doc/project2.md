@@ -196,7 +196,7 @@ There are multiple race conditions that we must consider when implementing prior
 
 2. When a kernel thread in Pintos calls thread_exit, when/where is the page containing its stack and TCB (i.e., struct thread) freed? Why can’t we just free this memory by calling palloc_free_page inside the thread_exit function?
 
-    A. After we disable interrupts and remove the thread element from the list, we call schedule to schedule a new thread, which afterwards calls thread_schedule_tail destroys the struct thread.  As noted from the comments in thread_schedule_tail, we can't free this memory because the memory was not obtained via palloc().
+    A. After we disable interrupts and remove the thread element from the list, we call schedule to schedule a new thread, which afterwards calls thread_schedule_tail that destroys the struct thread.  As noted from the comments in thread_schedule_tail, we can't free this memory because the memory was not obtained via palloc().
 
 3. When the thread_tick function is called by the timer interrupt handler, in which stack does it execute?
 

@@ -96,6 +96,13 @@ struct thread
     int fileDesc;
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    // Added by @John. This is the original priority assigned to the thread. 
+    int og_priority;
+    // Added by @John. Waiting_lock is the lock the thread is waiting for. 
+    struct lock *waiting_lock; 
+    // Added by @John. List of locks that the thread is holding. 
+    struct list held_locks;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

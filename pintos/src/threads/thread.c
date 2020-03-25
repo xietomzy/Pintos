@@ -478,6 +478,13 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+/* Comparator added by @John. Returns true if t1 has less priority than t2's, false
+if it's greater than or equal to.
+*/
+bool priority_comparator(struct thread *t1, struct thread *t2) {
+  return t1->priority < t2->priority;
+}
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -488,8 +495,20 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else {
+  /* Added by @John. We are going to sort the list by priority. Neil did mention
+  this is inefficient because of nlogn sorting time each time we have to pick the next
+  thread to run; does anyone remember what he said to fix this?
+  */
+    // list_sort(&ready_list, compare_priority);
+    struct list_elem *highest_priority_thread_element;
+    highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
+    struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
+    return highest_priority_thread;
+    
+    // This is the skeleton answer.
+    // return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page

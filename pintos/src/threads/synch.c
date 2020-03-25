@@ -156,6 +156,8 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
+
+
 
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
@@ -181,6 +183,13 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+/* Comparator added by @John. Returns true if t1 has less priority than t2's, false
+if it's greater than or equal to.
+*/
+bool priority_comparator(struct thread *t1, struct thread *t2) {
+  return t1->priority < t2->priority;
+}
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -196,8 +205,33 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+  // This is skeleton code
+  // sema_down (&lock->semaphore);
+  // lock->holder = thread_current ();
+
+  //Added by @John. Naive implementation from the design document.
+  struct thread *curr_thread = thread_current();
+
+  //Suggestion by @John; what if the lock's holder is null? Add null check here
+  if (lock->holder == NULL) {
+
+  } 
+
+  //Fetch the thread with the highest priority that holds this lock
+  struct thread *highest_priority_t_of_lock = list_max(&(lock->semaphore.waiters),
+   priority_comparator,
+   NULL);
+  
+  //Design doc implementation
+  if (curr_thread->priority < lock->holder->priority) {
+    list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
+    curr_thread->waiting_lock = lock;
+  } else if (curr_thread->priority > highest_priority_t_of_lock->priority 
+    && curr_thread->priority > lock->holder->priority) {
+      
+    }
+
+
 }
 
 /* Tries to acquires LOCK and returns true if successful or false

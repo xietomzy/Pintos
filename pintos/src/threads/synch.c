@@ -223,13 +223,33 @@ lock_acquire (struct lock *lock)
    NULL);
   
   //Design doc implementation
-  if (curr_thread->priority < lock->holder->priority) {
+  if (curr_thread->priority < lock->holder->priority) { //Current thread's priority less than lock's holder's priority
     list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
-  } else if (curr_thread->priority > highest_priority_t_of_lock->priority 
-    && curr_thread->priority > lock->holder->priority) {
-      
+  } else if (curr_thread->priority > highest_priority_t_of_lock->priority) { //Our priority is greater than the holder, perform priority donation
+    list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
+    curr_thread->waiting_lock = lock;
+
+    //Iteratively change priority
+    while(lock) {
+      if ((curr_thread->priority > list_max(&(lock->semaphore.waiters),
+        priority_comparator,
+        NULL))
+        && curr_thread->priority > lock->holder->priority) {
+          intr_disable();
+          lock->holder->priority = curr_thread->priority;
+          intr_enable();
+          curr_thread = lock->holder;
+          lock = curr_thread->waiting_lock;
+        } else {
+          break;
+        }
     }
+
+    sema_down(&(lock->semaphore));
+    lock->holder = curr_thread;
+    list_remove(&(curr_thread->elem));
+  }
 
 
 }

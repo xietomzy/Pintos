@@ -299,22 +299,29 @@ lock_release (struct lock *lock)
   // If this is stuck at negative 1, then we know to set the thread's priority to the og priority
   int max_priority = -1;
 
-  struct list_elem *held_lock_e;
-  struct lock *curr_lock;
-  struct list *curr_lock_waiters_list;
-  struct thread curr_waiting_thread;
+  // Elements of held_locks_list will be this
+  struct list_elem *curr_held_lock_e;
 
   // This nested for loop tries to set the maximum priority of other locks it holds
-  for (held_lock_e = list_begin(held_locks_list); 
-        held_lock_e != list_end(held_locks_list);
-        held_lock_e = list_next(held_lock_e)) 
+  for (curr_held_lock_e = list_begin(held_locks_list); 
+        curr_held_lock_e != list_end(held_locks_list);
+        curr_held_lock_e = list_next(held_lock_e)) 
   {
     // Fetch the element of held_lock_e;
-    curr_lock = list_entry(held_lock_e, struct lock, elem);
-    curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
+    struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
+    struct list * curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
+
+    // Elements of the waiters list will be a thread element
+    struct thread *curr_waiting_thread_e;
 
     // Now iterate through the waiting list of held_lock_e
-    for ()
+    for (curr_waiting_thread_e = list_begin(curr_lock_waiters_list); 
+      curr_waiting_thread_e != list_end(curr_lock_waiters_list);
+      curr_waiting_thread_e = list_next(curr_waiting_thread_e)) 
+    {
+      
+      // Fetch the thread's maximum priority
+    }
   }
 
 

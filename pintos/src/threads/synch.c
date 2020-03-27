@@ -298,6 +298,7 @@ lock_release (struct lock *lock)
 
   // If this is stuck at negative 1, then we know to set the thread's priority to the og priority
   int max_priority = -1;
+  struct thread *thread_with_max_priority = NULL;
 
   // Elements of held_locks_list will be this
   struct list_elem *curr_held_lock_e;
@@ -314,6 +315,8 @@ lock_release (struct lock *lock)
     // Elements of the waiters list will be a thread element
     struct list_elem *curr_waiting_thread_e;
 
+    // CASE TO WORRY ABOUT: What if we fetch the current thread from the waiters list?
+
     // Now iterate through the waiting list of held_lock_e
     for (curr_waiting_thread_e = list_begin(curr_lock_waiters_list); 
       curr_waiting_thread_e != list_end(curr_lock_waiters_list);
@@ -323,17 +326,24 @@ lock_release (struct lock *lock)
       struct thread *curr_waiting_thread = list_entry(curr_waiting_thread_e, struct thread, elem);
       if (curr_waiting_thread->priority > curr_thread->priority) {
         max_priority = curr_waiting_thread->priority;
+        thread_with_max_priority = curr_waiting_thread;
       }
     }
   }
 
+  // If there is another thread with a higher priority is waiting for another lock, then we must set this thread's priority 
   if (max_priority != -1) {
     curr_thread->priority = max_priority;
   } else {
     curr_thread->priority = curr_thread->og_priority;
   }
 
+  // If there is another thread waiting for this lock, then we set this lock's holder to be that thread
+  if (thread_with_max_priority != NULL) {
+    lock->holder = thread_with_max_priority;
+  }
   
+  intr_enable();
 
 
 }

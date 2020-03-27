@@ -302,27 +302,38 @@ lock_release (struct lock *lock)
   // Elements of held_locks_list will be this
   struct list_elem *curr_held_lock_e;
 
-  // This nested for loop tries to set the maximum priority of other locks it holds
+  // This outer loop iterates through all of my held locks
   for (curr_held_lock_e = list_begin(held_locks_list); 
         curr_held_lock_e != list_end(held_locks_list);
-        curr_held_lock_e = list_next(held_lock_e)) 
+        curr_held_lock_e = list_next(held_locks_list)) 
   {
-    // Fetch the element of held_lock_e;
+    // Fetch the lock from the curr_held_lock_e;
     struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
     struct list * curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
 
     // Elements of the waiters list will be a thread element
-    struct thread *curr_waiting_thread_e;
+    struct list_elem *curr_waiting_thread_e;
 
     // Now iterate through the waiting list of held_lock_e
     for (curr_waiting_thread_e = list_begin(curr_lock_waiters_list); 
       curr_waiting_thread_e != list_end(curr_lock_waiters_list);
       curr_waiting_thread_e = list_next(curr_waiting_thread_e)) 
     {
-      
       // Fetch the thread's maximum priority
+      struct thread *curr_waiting_thread = list_entry(curr_waiting_thread_e, struct thread, elem);
+      if (curr_waiting_thread->priority > curr_thread->priority) {
+        max_priority = curr_waiting_thread->priority;
+      }
     }
   }
+
+  if (max_priority != -1) {
+    curr_thread->priority = max_priority;
+  } else {
+    curr_thread->priority = curr_thread->og_priority;
+  }
+
+  
 
 
 }

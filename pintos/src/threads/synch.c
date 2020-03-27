@@ -245,13 +245,12 @@ lock_acquire (struct lock *lock)
           break;
         }
     }
-
+    //Disable interrupts?
     sema_down(&(lock->semaphore));
     lock->holder = curr_thread;
-    list_remove(&(curr_thread->elem));
+    list_remove(&(curr_thread->elem));  
+    //Enable interrupts?
   }
-
-
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -285,8 +284,40 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
+  // The following is the original skeleton code
+  // lock->holder = NULL;
+  // sema_up (&lock->semaphore);
+
+  // Start of naive implementation
+  intr_disable();
+
+  // Fetch current thread;
+  struct thread *curr_thread = thread_current();
+  struct list *held_locks_list = &(curr_thread->held_locks);
+  struct list *waiting_list;
+
+  // If this is stuck at negative 1, then we know to set the thread's priority to the og priority
+  int max_priority = -1;
+
+  struct list_elem *held_lock_e;
+  struct lock *curr_lock;
+  struct list *curr_lock_waiters_list;
+  struct thread curr_waiting_thread;
+
+  // This nested for loop tries to set the maximum priority of other locks it holds
+  for (held_lock_e = list_begin(held_locks_list); 
+        held_lock_e != list_end(held_locks_list);
+        held_lock_e = list_next(held_lock_e)) 
+  {
+    // Fetch the element of held_lock_e;
+    curr_lock = list_entry(held_lock_e, struct lock, elem);
+    curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
+
+    // Now iterate through the waiting list of held_lock_e
+    for ()
+  }
+
+
 }
 
 /* Returns true if the current thread holds LOCK, false

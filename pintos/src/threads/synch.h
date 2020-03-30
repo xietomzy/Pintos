@@ -4,6 +4,9 @@
 #include <list.h>
 #include <stdbool.h>
 
+bool priority_comparator(const struct list_elem *t1, const struct list_elem *t2, void *aux);
+static bool priority_cond_comparator (const struct list_elem *a, const struct list_elem *b, void *aux);
+
 /* A counting semaphore. */
 struct semaphore
   {
@@ -22,6 +25,7 @@ struct lock
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+    struct list_elem elem; /* list_elem for held_locks_list */
   };
 
 void lock_init (struct lock *);

@@ -481,9 +481,9 @@ alloc_frame (struct thread *t, size_t size)
 /* Comparator added by @John. Returns true if t1 has less priority than t2's, false
 if it's greater than or equal to.
 */
-bool priority_comparator(struct thread *t1, struct thread *t2) {
+/*bool priority_comparator(struct thread *t1, struct thread *t2) {
   return t1->priority < t2->priority;
-}
+}*/
 
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is

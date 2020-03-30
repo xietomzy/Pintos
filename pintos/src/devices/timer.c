@@ -89,16 +89,12 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks)
 {
-  // @Coby: Args validation
   if (ticks <= 0) {
     return;
   }
-  int64_t mark = timer_ticks () + ticks;
-  thread_current()->wakeup_mark = mark;
-
-  enum intr_level old = intr_disable();
-  thread_block();
-  intr_set_level(old);
+  int64_t wakeup_at = timer_ticks () + ticks;
+  thread_current()->wakeup = wakeup_at;
+  thread_sleep();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be

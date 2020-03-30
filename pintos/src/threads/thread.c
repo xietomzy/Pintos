@@ -63,7 +63,7 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
-static int64_t next_wakeup = -1;     /* the next time at which to wakeup threads. */
+static int64_t next_wakeup = -1;     /* tick at which to perform next wakeup */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -146,7 +146,7 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  if (timer_ticks() != -1 && timer_ticks() >= next_wakeup) {
+  if (next_wakeup != -1 && timer_ticks() >= next_wakeup) {
     wakeup();
   }
 
@@ -620,24 +620,36 @@ schedule (void)
 static void
 wakeup (void)
 {
-  ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 
+  struct thread *curr = thread_current();
   int64_t time = timer_ticks();
   struct list_elem *e;
+  struct list_elem *next;
   int64_t new_wakeup = -1;
   bool high_priority = false;
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
+  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
+    /* We must get next here, because the thread may be put onto
+       the ready list, which will change e's next. */
+    next = list_next(e);
     struct thread *t = list_entry(e, struct thread, elem);
     // Wakeup if time is up
-    if (t->wakeup >= time) {
-      //TODO: wakeup + check if yield
-    } else if () { //TODO: check if min
-      //TODO: update min
+    if (t->wakeup <= time) {
+      list_remove(e);
+      thread_unblock (t);
+      if (t->priority > curr->priority) {
+        high_priority = true;
+      }
+    } else if (new_wakeup == -1 || t->wakeup < new_wakeup) {
+      new_wakeup = t->wakeup;
     }
   }
   //set new min
+  next_wakeup = new_wakeup;
   // yield if high priority
+  if (high_priority) {
+    intr_yield_on_return ();
+  }
 }
 
 /* Returns a tid to use for a new thread. */

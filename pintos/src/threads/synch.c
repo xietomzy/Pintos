@@ -362,7 +362,7 @@ lock_release (struct lock *lock)
 
   sema_up(&lock->semaphore);
   //if ()
-    thread_yield();
+  thread_yield();
 
 
 }

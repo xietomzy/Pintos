@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "threads/malloc.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
@@ -24,6 +25,10 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+/* List of processes in the THREAD_BLOCKED state, that is, processes
+   that are waiting on some condition, that put themselves to sleep. */
+static struct list sleep_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -54,6 +59,7 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 /* Scheduling. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
+static int64_t next_wakeup = -1;     /* the next time at which to wakeup threads. */
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -71,6 +77,8 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+// @Coby
+static void wakeup (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -131,6 +139,10 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  if (timer_ticks() != -1 && timer_ticks >= next_wakeup) {
+    wakeup();
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -505,7 +517,7 @@ next_thread_to_run (void)
     highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
     struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
     return highest_priority_thread;
-    
+
     // This is the skeleton answer.
     // return list_entry (list_pop_front (&ready_list), struct thread, elem);
   }
@@ -574,6 +586,27 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+}
+
+/* Wakes up any threads who need to be woken up. */
+static void
+wakeup (void)
+{
+  int64_t time = timer_ticks();
+  int curr_priority = thread_current()->priority;
+  struct list_elem *e;
+  struct list_elem *next;
+  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
+    next = list_next (e);
+    struct thread *thread = list_entry (e, struct thread, elem);
+    // @Coby: Wake up thread if slept for long enough
+    if (thread->wakeup_mark >= time) {
+      thread_unblock(thread);
+      if (thread->priority > curr_priority) {
+        intr_yield_on_return();
+      }
+    }
+  }
 }
 
 /* Returns a tid to use for a new thread. */

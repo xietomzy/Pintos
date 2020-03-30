@@ -34,6 +34,10 @@ static struct list sleep_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of all sleeping processes. Processes add themselves to
+   this list by caling timer_sleep. */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -75,6 +79,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
+static void wakeup (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 // @Coby
@@ -98,6 +103,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -144,7 +150,7 @@ thread_tick (void)
     wakeup();
   }
 
-  /* Enforce preemption. */ 
+  /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
@@ -245,6 +251,24 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
+  intr_set_level (old_level);
+}
+
+/* Puts this thread to sleep until its wakeup time. This function
+   assumes the wakeup time has already been set.*/
+void
+thread_sleep (void)
+{
+  struct thread *curr = thread_current();
+  enum intr_level old_level = intr_disable ();
+  // If next wakeup is sooner, update
+  if (next_wakeup == -1 || curr->wakeup < next_wakeup) {
+    next_wakeup = curr->wakeup;
+  }
+  // Add to sleeping list
+  list_push_back (&sleep_list, &thread_current()->elem);
+  // Put ourselves to sleep
+  thread_block();
   intr_set_level (old_level);
 }
 
@@ -591,25 +615,29 @@ schedule (void)
   thread_schedule_tail (prev);
 }
 
-/* Wakes up any threads who need to be woken up. */
+/* Iterates through all sleeping threads, and wakes them up
+   if necessary. Interrupts should be turned off. */
 static void
 wakeup (void)
 {
+  ASSERT (!intr_context ());
+  ASSERT (intr_get_level () == INTR_OFF);
+
   int64_t time = timer_ticks();
-  int curr_priority = thread_current()->priority;
   struct list_elem *e;
-  struct list_elem *next;
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
-    next = list_next (e);
-    struct thread *thread = list_entry (e, struct thread, elem);
-    // @Coby: Wake up thread if slept for long enough
-    if (thread->wakeup_mark >= time) {
-      thread_unblock(thread);
-      if (thread->priority > curr_priority) {
-        intr_yield_on_return();
-      }
+  int64_t new_wakeup = -1;
+  bool high_priority = false;
+  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
+    struct thread *t = list_entry(e, struct thread, elem);
+    // Wakeup if time is up
+    if (t->wakeup >= time) {
+      //TODO: wakeup + check if yield
+    } else if () { //TODO: check if min
+      //TODO: update min
     }
   }
+  //set new min
+  // yield if high priority
 }
 
 /* Returns a tid to use for a new thread. */

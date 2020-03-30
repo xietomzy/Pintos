@@ -140,11 +140,11 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  if (timer_ticks() != -1 && timer_ticks >= next_wakeup) {
+  if (timer_ticks() != -1 && timer_ticks() >= next_wakeup) {
     wakeup();
   }
 
-  /* Enforce preemption. */
+  /* Enforce preemption. */ 
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
 }
@@ -342,6 +342,12 @@ void
 thread_set_priority (int new_priority)
 {
   thread_current ()->priority = new_priority;
+  struct list_elem *highest_priority_thread_element;
+  highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
+  struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
+  if (highest_priority_thread->priority > new_priority) {
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */
@@ -493,9 +499,6 @@ alloc_frame (struct thread *t, size_t size)
 /* Comparator added by @John. Returns true if t1 has less priority than t2's, false
 if it's greater than or equal to.
 */
-/*bool priority_comparator(struct thread *t1, struct thread *t2) {
-  return t1->priority < t2->priority;
-}*/
 
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is

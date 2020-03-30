@@ -49,7 +49,7 @@ bool priority_comparator(const struct list_elem *t1, const struct list_elem *t2,
   return a->priority < b->priority;
 }
 
-static bool priority_cond_comparator(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+bool priority_cond_comparator(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
   struct semaphore_elem *t1 = list_entry(a, struct semaphore_elem, elem);
   struct semaphore_elem *t2 = list_entry(b, struct semaphore_elem, elem);
   return t1->thread->priority < t2->thread->priority;
@@ -362,7 +362,7 @@ lock_release (struct lock *lock)
 
   sema_up(&lock->semaphore);
   //if ()
-  thread_yield();
+    thread_yield();
 
 
 }
@@ -410,6 +410,7 @@ cond_init (struct condition *cond)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
 void
 cond_wait (struct condition *cond, struct lock *lock)
 {

@@ -276,16 +276,16 @@ lock_acquire (struct lock *lock)
         break;
       }
     }
-    //Disable interrupts
-    //intr_disable();
-    old_level = intr_disable ();
-    sema_down(&(lock->semaphore));
-    //Enable interrupts
-    //intr_enable();
-    intr_set_level (old_level);
-    lock->holder = curr_thread;
-    list_remove(&(curr_thread->elem));
   }
+  //Disable interrupts
+  //intr_disable();
+  old_level = intr_disable ();
+  sema_down(&(lock->semaphore));
+  //Enable interrupts
+  //intr_enable();
+  intr_set_level (old_level);
+  lock->holder = curr_thread;
+  list_remove(&(curr_thread->elem));
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -384,8 +384,7 @@ lock_release (struct lock *lock)
   if (!intr_context ()) {
     thread_yield();
   }
-
-
+  //thread_set_priority(curr_thread->priority);
 }
 
 /* Returns true if the current thread holds LOCK, false

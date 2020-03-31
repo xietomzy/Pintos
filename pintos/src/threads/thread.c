@@ -266,7 +266,8 @@ thread_sleep (void)
     next_wakeup = curr->wakeup;
   }
   // Add to sleeping list
-  list_push_back (&sleep_list, &thread_current()->elem);
+  list_push_back (&sleep_list, &thread_current()->sleep_elem);
+  list_remove(&thread_current()->elem);
   // Put ourselves to sleep
   thread_block();
   intr_set_level (old_level);
@@ -642,7 +643,7 @@ wakeup (void)
     /* We must get next here, because the thread may be put onto
        the ready list, which will change e's next. */
     next = list_next(e);
-    struct thread *t = list_entry(e, struct thread, elem);
+    struct thread *t = list_entry(e, struct thread, sleep_elem);
     // Wakeup if time is up
     if (t->wakeup <= time) {
       list_remove(e);

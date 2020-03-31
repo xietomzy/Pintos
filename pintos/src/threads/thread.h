@@ -89,6 +89,7 @@ struct thread
     struct list children_status;      /* List of children as statuses */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    struct list_elem sleep_elem;        /* List element for thread_sleep */
     int64_t wakeup;                     /* Time at which to wake up */
 
 #ifdef USERPROG

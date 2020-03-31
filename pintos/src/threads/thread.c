@@ -365,6 +365,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
+  intr_disable();
   thread_current ()->priority = new_priority;
   struct list_elem *highest_priority_thread_element;
   highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
@@ -372,6 +373,7 @@ thread_set_priority (int new_priority)
   if (highest_priority_thread->priority > new_priority) {
     thread_yield();
   }
+  intr_enable();
 }
 
 /* Returns the current thread's priority. */
@@ -501,7 +503,11 @@ init_thread (struct thread *t, const char *name, int priority)
     list_init(&t->children_status);
     t->fileDesc = 3;
   #endif
-
+  //#ifdef THREADS_SYNCH_H
+    list_init(&t->held_locks);
+    //lock_init(t->waiting_lock);
+    t->og_priority = priority;
+  //#endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);

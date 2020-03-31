@@ -224,26 +224,37 @@ lock_acquire (struct lock *lock)
   // sema_down (&lock->semaphore);
   // lock->holder = thread_current ();
 
+  
+  enum intr_level old_level;
+
   //Added by @John. Naive implementation from the design document.
   struct thread *curr_thread = thread_current();
 
   //Suggestion by @John; what if the lock's holder is null? Add null check here
   if (lock->holder == NULL) {
-
+    //Disable interrupts
+    //intr_disable();
+    old_level = intr_disable ();
+    sema_down(&lock->semaphore);
+    //Enable interrupts
+    //intr_enable();
+    intr_set_level (old_level);
+    lock->holder = curr_thread;
+    return;
   }
 
   //Fetch the thread with the highest priority that holds this lock
-  struct list_elem *highest_priority_elem= list_max(&(lock->semaphore.waiters),
+  /*struct list_elem *highest_priority_elem= list_max(&(lock->semaphore.waiters),
    priority_comparator,
    NULL);
 
-  struct thread *highest_priority_t_of_lock = list_entry(highest_priority_elem, struct thread, elem);
+  struct thread *highest_priority_t_of_lock = list_entry(highest_priority_elem, struct thread, elem);*/
 
   //Design doc implementation
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
     list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
-  } else if (curr_thread->priority > highest_priority_t_of_lock->priority) { //Our priority is greater than the holder, perform priority donation
+  } else if (curr_thread->priority > lock->holder->priority) { //Our priority is greater than the holder, perform priority donation
     list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
 
@@ -309,7 +320,9 @@ lock_release (struct lock *lock)
   // sema_up (&lock->semaphore);
 
   // Start of naive implementation
-  intr_disable();
+  //intr_disable();
+  enum intr_level old_level;
+  old_level = intr_disable ();
 
   // Fetch current thread;
   struct thread *curr_thread = thread_current();
@@ -324,9 +337,7 @@ lock_release (struct lock *lock)
   struct list_elem *curr_held_lock_e;
 
   // This outer loop iterates through all held locks
-  for (curr_held_lock_e = list_begin(held_locks_list);
-        curr_held_lock_e != list_end(held_locks_list);
-        curr_held_lock_e = list_next(curr_held_lock_e))
+  for (curr_held_lock_e = list_begin(held_locks_list); curr_held_lock_e != list_end(held_locks_list); curr_held_lock_e = list_next(curr_held_lock_e))
   {
     // get waiter list for lock
     struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
@@ -358,11 +369,13 @@ lock_release (struct lock *lock)
     lock->holder = NULL;
   }
 
-  intr_enable();
-
+  //intr_enable();
+  intr_set_level (old_level);
   sema_up(&lock->semaphore);
   //if ()
+  if (!intr_context ()) {
     thread_yield();
+  }
 
 
 }

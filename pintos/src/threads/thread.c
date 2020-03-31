@@ -549,6 +549,7 @@ next_thread_to_run (void)
     struct list_elem *highest_priority_thread_element;
     highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
     struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
+    list_remove(highest_priority_thread_element);
     return highest_priority_thread;
 
     // This is the skeleton answer.

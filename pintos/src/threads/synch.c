@@ -265,9 +265,11 @@ lock_acquire (struct lock *lock)
         NULL);
       struct thread *max_thread = list_entry(max_elem, struct thread, elem);
       if (curr_thread->priority > max_thread->priority && curr_thread->priority > lock->holder->priority) {
-          intr_disable();
+          //intr_disable();
+          old_level = intr_disable ();
           lock->holder->priority = curr_thread->priority;
-          intr_enable();
+          //intr_enable();
+          intr_set_level (old_level);
           curr_thread = lock->holder;
           lock = curr_thread->waiting_lock;
       } else {
@@ -275,10 +277,12 @@ lock_acquire (struct lock *lock)
       }
     }
     //Disable interrupts
-    intr_disable();
+    //intr_disable();
+    old_level = intr_disable ();
     sema_down(&(lock->semaphore));
     //Enable interrupts
-    intr_enable();
+    //intr_enable();
+    intr_set_level (old_level);
     lock->holder = curr_thread;
     list_remove(&(curr_thread->elem));
   }
@@ -371,7 +375,11 @@ lock_release (struct lock *lock)
 
   //intr_enable();
   intr_set_level (old_level);
+
+  
+  old_level = intr_disable ();
   sema_up(&lock->semaphore);
+  intr_set_level (old_level);
   //if ()
   if (!intr_context ()) {
     thread_yield();

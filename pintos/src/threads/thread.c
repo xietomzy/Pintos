@@ -369,10 +369,12 @@ thread_set_priority (int new_priority)
   old_level = intr_disable ();
   thread_current ()->priority = new_priority;
   struct list_elem *highest_priority_thread_element;
-  highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
-  struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
-  if (highest_priority_thread->priority > new_priority) {
-    thread_yield();
+  if (!list_empty(&ready_list)) {
+    highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
+    struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
+    if (highest_priority_thread->priority > new_priority) {
+      thread_yield();
+    }
   }
   intr_set_level (old_level);
 }

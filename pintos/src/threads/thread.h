@@ -87,11 +87,15 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
     struct list children_status;      /* List of children as statuses */
-    struct file *executable;          /* Executable this thread was loaded from. */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+<<<<<<< HEAD
     // struct semaphore load;      /*Inform parent process when child has loaded*/
     // bool successful_load; 
+=======
+    struct list_elem sleep_elem;        /* List element for thread_sleep */
+    int64_t wakeup;                     /* Time at which to wake up */
+>>>>>>> ce158c313bcb5cc0119aa23b592f67971dc685ae
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -99,6 +103,16 @@ struct thread
     int fileDesc;
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    // Added by @John. This is the original priority assigned to the thread.
+    int og_priority;
+    // Added by @John. Waiting_lock is the lock the thread is waiting for.
+    struct lock *waiting_lock;
+    // Added by @John. List of locks that the thread is holding.
+    struct list held_locks;
+
+    // Added by @Coby. Stores when a thread should wake up next.
+    int64_t wakeup_mark;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -125,6 +139,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void thread_sleep (void);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -154,7 +169,8 @@ struct child_status {
     int ref_cnt;                /*Number of threads watching this status.*/
     tid_t childTid;             /*Child thread ID*/
     int exit_code;              /*Child exit code*/
-    struct semaphore finished; /*0 = child running, 1 = child finished*/
+    struct semaphore finished;  /*0 = child running, 1 = child finished*/
+    struct file *executable;    /* Executable this thread was loaded from. */
 };
 
 // Initiate child_status struct for this thread

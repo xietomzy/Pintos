@@ -633,33 +633,35 @@ wakeup (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
 
-  struct thread *curr = thread_current();
-  int64_t time = timer_ticks();
-  struct list_elem *e;
-  struct list_elem *next;
-  int64_t new_wakeup = -1;
-  bool high_priority = false;
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
-    /* We must get next here, because the thread may be put onto
-       the ready list, which will change e's next. */
-    next = list_next(e);
-    struct thread *t = list_entry(e, struct thread, sleep_elem);
-    // Wakeup if time is up
-    if (t->wakeup <= time) {
-      list_remove(e);
-      thread_unblock (t);
-      if (t->priority > curr->priority) {
-        high_priority = true;
+  if (!list_empty(&sleep_list)) {
+    struct thread *curr = thread_current();
+    int64_t time = timer_ticks();
+    struct list_elem *e;
+    //struct list_elem *next;
+    int64_t new_wakeup = -1;
+    bool high_priority = false;
+    for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
+      /* We must get next here, because the thread may be put onto
+        the ready list, which will change e's next. */
+      //next = list_next(e);
+      struct thread *t = list_entry(e, struct thread, sleep_elem);
+      // Wakeup if time is up
+      if (t->wakeup <= time) {
+        list_remove(e);
+        thread_unblock (t);
+        if (t->priority > curr->priority) {
+          high_priority = true;
+        }
+      } else if (new_wakeup == -1 || t->wakeup < new_wakeup) {
+        new_wakeup = t->wakeup;
       }
-    } else if (new_wakeup == -1 || t->wakeup < new_wakeup) {
-      new_wakeup = t->wakeup;
     }
-  }
-  //set new min
-  next_wakeup = new_wakeup;
-  // yield if high priority
-  if (high_priority) {
-    intr_yield_on_return ();
+    //set new min
+    next_wakeup = new_wakeup;
+    // yield if high priority
+    if (high_priority) {
+      intr_yield_on_return ();
+    }
   }
 }
 

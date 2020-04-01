@@ -227,7 +227,7 @@ lock_acquire (struct lock *lock)
   // sema_down (&lock->semaphore);
   // lock->holder = thread_current ();
 
-  
+
   enum intr_level old_level;
 
   //Added by @John. Naive implementation from the design document.
@@ -238,6 +238,7 @@ lock_acquire (struct lock *lock)
     //Disable interrupts
     //intr_disable();
     old_level = intr_disable ();
+    list_push_front(&curr_thread->held_locks, &(lock->elem));
     sema_down(&lock->semaphore);
     //Enable interrupts
     //intr_enable();
@@ -255,28 +256,34 @@ lock_acquire (struct lock *lock)
 
   //Design doc implementation
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
-    list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
+    // list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
   } else if (curr_thread->priority > lock->holder->priority) { //Our priority is greater than the holder, perform priority donation
-    list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
+    // list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
+
 
     // while loop needed to do nested priority donation
     while(lock) {
-      if (!list_empty(&(lock->semaphore.waiters))) {
-        struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
-        struct thread *max_thread = list_entry(max_elem, struct thread, elem);
-        if (curr_thread->priority > max_thread->priority && curr_thread->priority > lock->holder->priority) {
-            //intr_disable();
-            old_level = intr_disable ();
-            lock->holder->priority = curr_thread->priority;
-            //intr_enable();
-            intr_set_level (old_level);
-            curr_thread = lock->holder;
-            lock = curr_thread->waiting_lock;
-        } else {
-          break;
-        }
+      // if (!list_empty(&(lock->semaphore.waiters))) {
+      //   struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
+      //   struct thread *max_thread = list_entry(max_elem, struct thread, elem);
+      //   if (curr_thread->priority > lock->holder->priority) {
+      //       //intr_disable();
+      //       old_level = intr_disable ();
+      //       lock->holder->priority = curr_thread->priority;
+      //       //intr_enable();
+      //       intr_set_level (old_level);
+      //       curr_thread = lock->holder;
+      //       lock = curr_thread->waiting_lock;
+      //   } else {
+      //     break;
+      //   }
+      // }
+      if (curr_thread->priority > lock->holder->priority) {
+        lock->holder->priority = curr_thread->priority;
+        curr_thread = lock->holder;
+        lock = curr_thread->waiting_lock;
       }
     }
   }
@@ -288,6 +295,7 @@ lock_acquire (struct lock *lock)
   //intr_enable();
   intr_set_level (old_level);
   lock->holder = curr_thread;
+  list_push_front(&curr_thread->held_locks, &(lock->elem));
   //list_remove(&(curr_thread->elem));
 }
 
@@ -349,21 +357,27 @@ lock_release (struct lock *lock)
     {
       // get waiter list for lock
       struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
-      struct list * curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
+      // struct list * curr_lock_waiters_list = &(curr_lock->semaphore.waiters);
       // get maximum thread/priority from list and change thread_with_max_priority if needed
-      if (!list_empty(curr_lock_waiters_list)) {
-        struct list_elem *max_elem = list_max(curr_lock_waiters_list, priority_comparator, NULL);
-        struct thread *max_thread = list_entry(max_elem, struct thread, elem);
-        if (max_priority < max_thread->priority) {
-          max_priority = max_thread->priority;
+      // if (!list_empty(curr_lock_waiters_list)) {
+      //   struct list_elem *max_elem = list_max(curr_lock_waiters_list, priority_comparator, NULL);
+      //   struct thread *max_thread = list_entry(max_elem, struct thread, elem);
+        if (lock != curr_lock && max_priority < curr_lock->holder->priority) {
+          max_priority = curr_lock->holder->priority;
           //thread_with_max_priority = max_thread;
         }
-      }
+        if (lock == curr_lock)
+          list_remove(curr_held_lock_e);
+      // }
     }
   }
-
+  struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
+  struct thread *max_thread_waiter = list_entry(max_elem, struct thread, elem);
+  if (max_priority < max_thread_waiter->priority) {
+    max_priority = max_thread_waiter->priority;
+  }
   // set curr_thread priority to either max_thread or og
-  if (max_priority > curr_thread->priority) {
+  if (max_priority > curr_thread->og_priority) {
     curr_thread->priority = max_priority;
   } else {
     curr_thread->priority = curr_thread->og_priority;
@@ -371,20 +385,22 @@ lock_release (struct lock *lock)
 
   // If there is another thread waiting for this lock, then we set this lock's holder to be
   // the thread with the highest priority
-  if (!list_empty(&(lock->semaphore.waiters))) {
-    struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
-    struct thread *max_thread_waiter = list_entry(max_elem, struct thread, elem);
-    if (max_elem != list_tail(&(lock->semaphore.waiters))) {
-      lock->holder = max_thread_waiter;
-    }
-  } else {
-    lock->holder = NULL;
-  }
+  // if (!list_empty(&(lock->semaphore.waiters))) {
+  //   struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
+  //   struct thread *max_thread_waiter = list_entry(max_elem, struct thread, elem);
+  //   if (max_elem != list_tail(&(lock->semaphore.waiters))) {
+  //     lock->holder = max_thread_waiter;
+  //   }
+  // } else {
+  //   lock->holder = NULL;
+  // }
 
   //intr_enable();
   intr_set_level (old_level);
 
   old_level = intr_disable ();
+
+    lock->holder = NULL;
   sema_up(&lock->semaphore);
   intr_set_level (old_level);
   //if ()

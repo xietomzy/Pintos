@@ -315,7 +315,6 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
-    printf ("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
   process_exit ();
 #endif
 
@@ -376,14 +375,6 @@ thread_set_priority (int new_priority)
   }
   intr_set_level (old_level);
   thread_yield();
-  // struct list_elem *highest_priority_thread_element;
-  // if (!list_empty(&ready_list)) {
-  //   highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
-  //   struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
-  //   if (highest_priority_thread->priority > thread_current ()->priority) {
-  //     thread_yield();
-  //   }
-  // }
 
 }
 
@@ -509,11 +500,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  #ifdef USERPROG
-    list_init(&t->fileDescriptorList);
-    list_init(&t->children_status);
-    t->fileDesc = 3;
-  #endif
   //#ifdef THREADS_SYNCH_H
     list_init(&t->held_locks);
     //lock_init(t->waiting_lock);
@@ -686,11 +672,6 @@ allocate_tid (void)
   return tid;
 }
 
-void status_init (struct child_status *status) {
-    sema_init(&status->load, 0);
-    sema_init(&status->finished, 0);
-    lock_init(&status->ref_lock);
-}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

@@ -85,24 +85,10 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-    struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
-    struct list children_status;      /* List of children as statuses */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-<<<<<<< HEAD
-    // struct semaphore load;      /*Inform parent process when child has loaded*/
-    // bool successful_load; 
-=======
     struct list_elem sleep_elem;        /* List element for thread_sleep */
     int64_t wakeup;                     /* Time at which to wake up */
->>>>>>> ce158c313bcb5cc0119aa23b592f67971dc685ae
-
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    struct list fileDescriptorList;
-    int fileDesc;
-    uint32_t *pagedir;                  /* Page directory. */
-#endif
     // Added by @John. This is the original priority assigned to the thread.
     int og_priority;
     // Added by @John. Waiting_lock is the lock the thread is waiting for.
@@ -116,12 +102,6 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-  struct fileDescriptor
-    {
-      struct list_elem fileElem;
-      struct file *fileptr;
-      int fd;
-    };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -159,21 +139,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
-/* Child status struct, allocated on the heap for access from both parent and child. */
-struct child_status {
-    struct semaphore load;      /*Inform parent process when child has loaded*/
-    bool successful_load;       /*Whether the child loaded properly*/
-    struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
-    struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
-    int ref_cnt;                /*Number of threads watching this status.*/
-    tid_t childTid;             /*Child thread ID*/
-    int exit_code;              /*Child exit code*/
-    struct semaphore finished;  /*0 = child running, 1 = child finished*/
-    struct file *executable;    /* Executable this thread was loaded from. */
-};
-
-// Initiate child_status struct for this thread
-void status_init (struct child_status *status);
 
 #endif /* threads/thread.h */

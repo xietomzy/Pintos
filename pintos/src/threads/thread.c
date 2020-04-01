@@ -182,6 +182,17 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  struct child_status *s_status = (struct child_status *)malloc(sizeof(struct child_status));
+  ASSERT (s_status != NULL);
+  status_init(s_status);
+  s_status->successful_load = false;
+  s_status->childTid = tid;
+  s_status->ref_cnt = 2;
+  t->self_status = s_status;
+
+  // Add to parent
+  list_push_back(&thread_current()->children_status, &s_status->elem);
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -280,6 +291,7 @@ thread_exit (void)
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
+    printf ("%s: exit(%d)\n", &thread_current ()->name, thread_current()->self_status->exit_code);
   process_exit ();
 #endif
 
@@ -460,7 +472,6 @@ init_thread (struct thread *t, const char *name, int priority)
   #ifdef USERPROG
     list_init(&t->fileDescriptorList);
     list_init(&t->children_status);
-    sema_init(&t->load, 0);
     t->fileDesc = 3;
   #endif
 
@@ -576,7 +587,7 @@ allocate_tid (void)
 }
 
 void status_init (struct child_status *status) {
-    // sema_init(&status->load, 0);
+    sema_init(&status->load, 0);
     sema_init(&status->finished, 0);
     lock_init(&status->ref_lock);
 }

@@ -90,8 +90,8 @@ struct thread
     struct file *executable;          /* Executable this thread was loaded from. */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    struct semaphore load;      /*Inform parent process when child has loaded*/
-    bool successful_load; 
+    // struct semaphore load;      /*Inform parent process when child has loaded*/
+    // bool successful_load; 
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -106,6 +106,7 @@ struct thread
     {
       struct list_elem fileElem;
       struct file *fileptr;
+      int fd;
     };
 
 /* If false (default), use round-robin scheduler.
@@ -146,8 +147,8 @@ int thread_get_load_avg (void);
 
 /* Child status struct, allocated on the heap for access from both parent and child. */
 struct child_status {
-    // struct semaphore load;      /*Inform parent process when child has loaded*/
-    // bool successful_load;       /*Whether the child loaded properly*/
+    struct semaphore load;      /*Inform parent process when child has loaded*/
+    bool successful_load;       /*Whether the child loaded properly*/
     struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
     struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
     int ref_cnt;                /*Number of threads watching this status.*/

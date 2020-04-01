@@ -25,7 +25,7 @@ syscall_init (void)
 }
 
 static bool validate(uint32_t *pd, const void* ptr) {
-  return ptr != NULL && pagedir_get_page(pd, ptr) && is_user_vaddr(ptr);
+  return ptr != NULL && is_user_vaddr(ptr) != NULL && pagedir_get_page(pd, ptr) != NULL;
 }
 
 static void
@@ -49,7 +49,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   struct thread *t = thread_current();
   if (args[0] == SYS_EXIT) {
     f->eax = args[1];
-    printf ("%s: exit(%d)\n", &thread_current ()->name, args[1]);
+    t->self_status->exit_code = args[1];
+
     thread_exit ();
   } else if (args[0] == SYS_PRACTICE) {
     f->eax = args[1] + 1;
@@ -86,6 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       } else {
         struct fileDescriptor* fileD = malloc(sizeof(struct fileDescriptor));
         fileD->fileptr = filePtr;
+        fileD->fd = t->fileDesc;
         list_push_back(&t->fileDescriptorList, &fileD->fileElem);
         f->eax = t->fileDesc;
         t->fileDesc += 1;
@@ -93,14 +95,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       lock_release(&globalFileLock);
     }
   } else if (args[0] == SYS_CREATE) {
-    if (validate(t->pagedir, args[1])) {
+    const char* file = (char*) args[1];
+    if (validate(t->pagedir, file)) {
       lock_acquire(&globalFileLock);
-      const char* file = (char*) args[1];
       unsigned size = args[2];
       bool success = filesys_create(file, size);
-      f->eax = success;
+      f->eax = !success;
       lock_release(&globalFileLock);
     }
+    f->eax = -1;
   } else if (args[0] == SYS_REMOVE) {
     if (validate(t->pagedir, args[1])) {
       lock_acquire(&globalFileLock);
@@ -109,16 +112,25 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = success;
       lock_release(&globalFileLock);
     }
+    f->eax = -1;
   } else if (args[0] == SYS_FILESIZE) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin (&t->fileDescriptorList);
     int fd = args[1];
-    for (int i = 2; i < fd; i++) {
+    for (int i = 2; i < fd - 1; i++) {
       e = list_next(e);
     }
-    struct fileDescriptor* fileD = list_entry(e, struct fileDescriptor, fileElem);
-    off_t size = file_length(fileD->fileptr);
-    f->eax = size;
+    if (fd >= t->fileDesc || fd < 0) {
+      f->eax = -1;
+    } else {
+      struct fileDescriptor* fileD = list_entry(e, struct fileDescriptor, fileElem);
+      if (fileD->fd != fd) {
+        f->eax = -1;
+      } else {
+        off_t size = file_length(fileD->fileptr);
+        f->eax = size;
+      }
+    }
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_READ) {
     if (validate(t->pagedir, args[2])) {
@@ -126,18 +138,33 @@ syscall_handler (struct intr_frame *f UNUSED)
       int fd = args[1];
       void* buffer = (void*) args[2];
       unsigned sizeB = args[3];
-      if (fd == 0) {
-        // for (int i = 0; i < )
-          //input_getc()
+      if (fd >= t->fileDesc || fd < 0) {
+        f->eax = -1;
       } else {
-        struct list_elem *e = list_begin(&t->fileDescriptorList);
-        for (int i = 2; i < fd; i++) {
-          e = list_next(e);
+        if (fd == 0) {
+            uint8_t *input = (uint8_t *) buffer; // stdin
+            int bytes_read = 0;
+            while (bytes_read < sizeB) {
+              input[bytes_read] = input_getc();
+              if (input[bytes_read + 1] == '\n') {
+                break;
+              }
+            }
+            f->eax = bytes_read;
+        } else {
+          struct list_elem *e = list_begin(&t->fileDescriptorList);
+          for (int i = 2; i < fd - 1; i++) {
+            e = list_next(e);
+          }
+          struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+          if (fileD->fd != fd) {
+            f->eax = -1;
+          } else {
+            off_t size = file_read(fileD->fileptr, buffer, sizeB);
+            f->eax = size;
+          }
+          lock_release(&globalFileLock);
         }
-        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-        off_t size = file_read(fileD->fileptr, buffer, sizeB);
-        f->eax = size;
-        lock_release(&globalFileLock);
       }
     }
   } else if (args[0] == SYS_WRITE) {
@@ -146,16 +173,24 @@ syscall_handler (struct intr_frame *f UNUSED)
       int fd = args[1];
       const void* buffer = (void*) args[2];
       unsigned sizeB = args[3];
-      if (fd == 1) {
-        putbuf(buffer, sizeB);
+      if (fd >= t->fileDesc || fd < 0) {
+        f->eax = -1;
       } else {
-        struct list_elem *e = list_begin(&t->fileDescriptorList);
-        for (int i = 2; i < fd; i++) {
-          e = list_next(e);
+        if (fd == 1) {
+          putbuf(buffer, sizeB);
+        } else {
+          struct list_elem *e = list_begin(&t->fileDescriptorList);
+          for (int i = 2; i < fd - 1; i++) {
+            e = list_next(e);
+          }
+          struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+          if (fileD->fd != fd) {
+            f->eax = -1;
+          } else {
+            off_t size = file_write(fileD->fileptr, buffer, sizeB);
+            f->eax = size;
+          }
         }
-        struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-        off_t size = file_write(fileD->fileptr, buffer, sizeB);
-        f->eax = size;
       }
       lock_release(&globalFileLock);
     }
@@ -163,34 +198,60 @@ syscall_handler (struct intr_frame *f UNUSED)
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin(&t->fileDescriptorList);
     int fd = args[1];
-    for (int i = 2; i < fd; i++) {
-      e = list_next(e);
+    if (fd >= t->fileDesc || fd < 0) {
+      f->eax = -1;
+    } else {
+      for (int i = 2; i < fd - 1; i++) {
+        e = list_next(e);
+      }
+      struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+      if (fileD->fd != fd) {
+        f->eax = -1;
+      } else {
+        unsigned size = args[2];
+        file_seek(fileD->fileptr, size);
+      }
     }
-    struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-    unsigned size = args[2];
-    file_seek(fileD->fileptr, size);
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_TELL) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin(&t->fileDescriptorList);
     int fd = args[1];
-    for (int i = 2; i < fd; i++) {
-      e = list_next(e);
+    if (fd >= t->fileDesc || fd < 0) {
+      f->eax = -1;
+    } else {
+      for (int i = 2; i < fd - 1; i++) {
+        e = list_next(e);
+      }
+      struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+      if (fileD->fd != fd) {
+        f->eax = -1;
+      } else {
+        off_t tell = file_tell(fileD->fileptr);
+        f->eax = tell;
+      }
     }
-    struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
-    off_t tell = file_tell(fileD->fileptr);
-    f->eax = tell;
     lock_release(&globalFileLock);
   } else if (args[0] == SYS_CLOSE) {
     lock_acquire(&globalFileLock);
     struct list_elem *e = list_begin(&t->fileDescriptorList);
     int fd = args[1];
-    for (int i = 2; i < fd; i++) {
-      e = list_next(e);
+    if (fd >= t->fileDesc || fd < 0) {
+      f->eax = -1;
+    } else {
+      for (int i = 2; i < fd - 1; i++) {
+        e = list_next(e);
+      }
+      struct fileDescriptor * fileD = list_entry(e, struct fileDescriptor, fileElem);
+          
+      if (fileD->fd != fd) {
+        f->eax = -1;
+      } else {
+        list_remove(e);
+        file_close(fileD->fileptr);
+      }
     }
-    struct list_elem *removed = list_remove(e);
-    struct fileDescriptor * fileD = list_entry(removed, struct fileDescriptor, fileElem);
-    file_close(fileD->fileptr);
+
     lock_release(&globalFileLock);
   }
 }

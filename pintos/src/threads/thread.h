@@ -92,6 +92,9 @@ struct thread
     struct list_elem sleep_elem;        /* List element for thread_sleep */
     int64_t wakeup;                     /* Time at which to wake up */
 
+    struct list lock_acquire_list;     /* List for lock_acquire */
+    struct list_elem lock_acquire_elem; 
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     struct list fileDescriptorList;

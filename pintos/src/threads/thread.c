@@ -368,7 +368,7 @@ thread_set_priority (int new_priority)
 {
   enum intr_level old_level;
   old_level = intr_disable ();
-  thread_current ()->priority = new_priority;
+  thread_current ()->og_priority = new_priority;
   struct list_elem *highest_priority_thread_element;
   if (!list_empty(&ready_list)) {
     highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
@@ -511,6 +511,7 @@ init_thread (struct thread *t, const char *name, int priority)
     list_init(&t->held_locks);
     //lock_init(t->waiting_lock);
     t->og_priority = priority;
+    list_init(&t->lock_acquire_list);
   //#endif
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -545,10 +546,6 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else {
-  /* Added by @John. We are going to sort the list by priority. Neil did mention
-  this is inefficient because of nlogn sorting time each time we have to pick the next
-  thread to run; does anyone remember what he said to fix this?
-  */
     // list_sort(&ready_list, compare_priority);
     struct list_elem *highest_priority_thread_element;
     highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);

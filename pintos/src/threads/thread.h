@@ -91,7 +91,6 @@ struct thread
     struct list_elem elem;              /* List element. */
     int64_t wakeup;                     /* Time at which to wake up */
     struct list_elem sleep_elem;
-
     struct list_elem lock_acq_elem;
 
 #ifdef USERPROG

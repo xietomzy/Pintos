@@ -503,11 +503,8 @@ init_thread (struct thread *t, const char *name, int priority)
     list_init(&t->children_status);
     t->fileDesc = 3;
   #endif
-  //#ifdef THREADS_SYNCH_H
-    list_init(&t->held_locks);
-    //lock_init(t->waiting_lock);
-    t->og_priority = priority;
-  //#endif
+  list_init(&t->held_locks);
+  t->og_priority = priority;
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
@@ -545,15 +542,11 @@ next_thread_to_run (void)
   this is inefficient because of nlogn sorting time each time we have to pick the next
   thread to run; does anyone remember what he said to fix this?
   */
-    // list_sort(&ready_list, compare_priority);
     struct list_elem *highest_priority_thread_element;
     highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
     struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
     list_remove(highest_priority_thread_element);
     return highest_priority_thread;
-
-    // This is the skeleton answer.
-    // return list_entry (list_pop_front (&ready_list), struct thread, elem);
   }
 }
 
@@ -641,7 +634,6 @@ wakeup (void)
         the ready list, which will change e's next. */
       next = list_next(e);
       struct thread *t = list_entry(e, struct thread, sleep_elem);
-      // Wakeup if time is up
       if (t->wakeup <= time) {
         list_remove(e);
         thread_unblock (t);

@@ -214,8 +214,8 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  thread_yield();
 
+  thread_yield();
   return tid;
 }
 
@@ -268,7 +268,6 @@ thread_sleep (void)
   }
   // Add to sleeping list
   list_push_back (&sleep_list, &thread_current()->sleep_elem);
-  list_remove(&thread_current()->elem);
   // Put ourselves to sleep
   thread_block();
   intr_set_level (old_level);
@@ -375,7 +374,6 @@ thread_set_priority (int new_priority)
   }
   intr_set_level (old_level);
   thread_yield();
-
 }
 
 /* Returns the current thread's priority. */
@@ -500,6 +498,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  #ifdef USERPROG
+    list_init(&t->fileDescriptorList);
+    list_init(&t->children_status);
+    t->fileDesc = 3;
+  #endif
   //#ifdef THREADS_SYNCH_H
     list_init(&t->held_locks);
     //lock_init(t->waiting_lock);
@@ -626,17 +629,17 @@ wakeup (void)
 {
   ASSERT (intr_get_level () == INTR_OFF);
 
+  struct thread *curr = thread_current();
+  int64_t time = timer_ticks();
+  struct list_elem *e;
+  struct list_elem *next;
+  int64_t new_wakeup = -1;
+  bool high_priority = false;
   if (!list_empty(&sleep_list)) {
-    struct thread *curr = thread_current();
-    int64_t time = timer_ticks();
-    struct list_elem *e;
-    //struct list_elem *next;
-    int64_t new_wakeup = -1;
-    bool high_priority = false;
-    for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)) {
+    for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
       /* We must get next here, because the thread may be put onto
         the ready list, which will change e's next. */
-      //next = list_next(e);
+      next = list_next(e);
       struct thread *t = list_entry(e, struct thread, sleep_elem);
       // Wakeup if time is up
       if (t->wakeup <= time) {
@@ -649,12 +652,12 @@ wakeup (void)
         new_wakeup = t->wakeup;
       }
     }
-    //set new min
-    next_wakeup = new_wakeup;
-    // yield if high priority
-    if (high_priority) {
-      intr_yield_on_return ();
-    }
+  }
+  //set new min
+  next_wakeup = new_wakeup;
+  // yield if high priority
+  if (high_priority) {
+    intr_yield_on_return ();
   }
 }
 
@@ -672,6 +675,11 @@ allocate_tid (void)
   return tid;
 }
 
+void status_init (struct child_status *status) {
+    sema_init(&status->load, 0);
+    sema_init(&status->finished, 0);
+    lock_init(&status->ref_lock);
+}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

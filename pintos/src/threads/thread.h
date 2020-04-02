@@ -27,13 +27,11 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* A kernel thread or user process.
-
    Each thread structure is stored in its own 4 kB page.  The
    thread structure itself sits at the very bottom of the page
    (at offset 0).  The rest of the page is reserved for the
    thread's kernel stack, which grows downward from the top of
    the page (at offset 4 kB).  Here's an illustration:
-
         4 kB +---------------------------------+
              |          kernel stack           |
              |                |                |
@@ -55,22 +53,18 @@ typedef int tid_t;
              |               name              |
              |              status             |
         0 kB +---------------------------------+
-
    The upshot of this is twofold:
-
       1. First, `struct thread' must not be allowed to grow too
          big.  If it does, then there will not be enough room for
          the kernel stack.  Our base `struct thread' is only a
          few bytes in size.  It probably should stay well under 1
          kB.
-
       2. Second, kernel stacks must not be allowed to grow too
          large.  If a stack overflows, it will corrupt the thread
          state.  Thus, kernel functions should not allocate large
          structures or arrays as non-static local variables.  Use
          dynamic allocation with malloc() or palloc_get_page()
          instead.
-
    The first symptom of either of these problems will probably be
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
@@ -91,9 +85,13 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    struct child_status *self_status; /* Status of self. On heap, allocated by parent. */
+    struct list children_status;      /* List of children as statuses */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    int64_t wakeup;                     /* Time at which to wake up */
+    struct list_elem sleep_elem;
+    struct list_elem lock_acq_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -101,10 +99,25 @@ struct thread
     int fileDesc;
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    // Added by @John. This is the original priority assigned to the thread.
+    int og_priority;
+    // Added by @John. Waiting_lock is the lock the thread is waiting for.
+    struct lock *waiting_lock;
+    // Added by @John. List of locks that the thread is holding.
+    struct list held_locks;
+
+    // Added by @Coby. Stores when a thread should wake up next.
+    int64_t wakeup_mark;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+  struct fileDescriptor
+    {
+      struct list_elem fileElem;
+      struct file *fileptr;
+      int fd;
+    };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -122,6 +135,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void thread_sleep (void);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -141,5 +155,21 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+/* Child status struct, allocated on the heap for access from both parent and child. */
+struct child_status {
+    struct semaphore load;      /*Inform parent process when child has loaded*/
+    bool successful_load;       /*Whether the child loaded properly*/
+    struct list_elem elem;      /*We want the child statuses in a linked list for the parent*/
+    struct lock ref_lock;       /*Prevent ref_count from being concurrently modified*/
+    int ref_cnt;                /*Number of threads watching this status.*/
+    tid_t childTid;             /*Child thread ID*/
+    int exit_code;              /*Child exit code*/
+    struct semaphore finished;  /*0 = child running, 1 = child finished*/
+    struct file *executable;    /* Executable this thread was loaded from. */
+};
+
+// Initiate child_status struct for this thread
+void status_init (struct child_status *status);
 
 #endif /* threads/thread.h */

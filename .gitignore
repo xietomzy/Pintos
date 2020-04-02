@@ -4,3 +4,5 @@
 *~
 .DS_Store
 pintos/**/build
+remove_files.txt
+pintos/src/userprog/filesys.dsk

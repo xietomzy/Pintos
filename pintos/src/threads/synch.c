@@ -255,7 +255,9 @@ lock_acquire (struct lock *lock)
   struct thread *highest_priority_t_of_lock = list_entry(highest_priority_elem, struct thread, elem);*/
 
   //Design doc implementation
-  
+  struct lock *og_lock = lock;
+  struct thread *og_curr_thread = curr_thread;
+
   old_level = intr_disable ();
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
     list_push_front(&(lock->semaphore.lock_acq_list), &(curr_thread->lock_acq_elem));
@@ -298,7 +300,13 @@ lock_acquire (struct lock *lock)
         }
       }
 
-      
+      // if (curr_thread->priority > lock->holder->priority) {
+      //   old_level = intr_disable ();
+      //   lock->holder->priority = curr_thread->priority;
+      //   intr_set_level (old_level);
+      //   curr_thread = lock->holder;
+      //   lock = curr_thread->waiting_lock;
+      // }
       // if (lock->holder != NULL) {
       //   if (curr_thread->priority > lock->holder->priority) {
       //     //old_level = intr_disable ();
@@ -313,19 +321,20 @@ lock_acquire (struct lock *lock)
     }
 
   }
-  
-  //Disable interrupts
-  
   intr_set_level (old_level);
 
-
-  list_remove(&(curr_thread->lock_acq_elem));
   old_level = intr_disable ();
-  sema_down(&(lock->semaphore));
-  //Enable interrupts
-  //intr_enable();
+  list_remove(&(og_curr_thread->lock_acq_elem));
   intr_set_level (old_level);
-  lock->holder = curr_thread;
+
+  sema_down(&(og_lock->semaphore));
+
+  lock->holder = og_curr_thread;
+
+  
+  old_level = intr_disable ();
+  list_push_back(&(og_curr_thread->held_locks), &(og_lock->elem));
+  intr_set_level (old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -386,6 +395,10 @@ lock_release (struct lock *lock)
     {
       // get waiter list for lock
       struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
+      if (lock == curr_lock) {
+        list_remove(curr_held_lock_e);
+        continue;
+      }
       struct list * curr_lock_waiters_list = &(curr_lock->semaphore.lock_acq_list);
       // get maximum thread/priority from list and change thread_with_max_priority if needed
       if (!list_empty(curr_lock_waiters_list)) {
@@ -396,6 +409,13 @@ lock_release (struct lock *lock)
           //thread_with_max_priority = max_thread;
         }
       }
+      // // get waiter list for lock
+      // struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
+      // if (lock != curr_lock && max_priority < curr_lock->holder->priority) {
+      //   max_priority = curr_lock->holder->priority;
+      // }
+      // if (lock == curr_lock)
+      //   list_remove(curr_held_lock_e);
     }
   }
 

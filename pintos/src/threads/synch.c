@@ -214,11 +214,6 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  // This is skeleton code
-  // sema_down (&lock->semaphore);
-  // lock->holder = thread_current ();
-
-
   enum intr_level old_level;
 
   //Added by @John. Naive implementation from the design document.
@@ -227,22 +222,15 @@ lock_acquire (struct lock *lock)
   //Suggestion by @John; what if the lock's holder is null? Add null check here
   if (lock->holder == NULL) {
     //Disable interrupts
-    //intr_disable();
     old_level = intr_disable ();
     list_push_front(&curr_thread->held_locks, &(lock->elem));
     sema_down(&lock->semaphore);
     //Enable interrupts
-    //intr_enable();
     intr_set_level (old_level);
     lock->holder = curr_thread;
     return;
   }
 
-  //Fetch the thread with the highest priority that holds this lock
-  /*struct list_elem *highest_priority_elem= list_max(&(lock->semaphore.waiters),
-   priority_comparator,
-   NULL);
-  struct thread *highest_priority_t_of_lock = list_entry(highest_priority_elem, struct thread, elem);*/
   struct lock* og_lock = lock;
   //Design doc implementation
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
@@ -262,12 +250,8 @@ lock_acquire (struct lock *lock)
       }
     }
   }
-  //Disable interrupts
-  //intr_disable();
   old_level = intr_disable ();
   sema_down(&(og_lock->semaphore));
-  //Enable interrupts
-  //intr_enable();
   intr_set_level (old_level);
   og_lock->holder = thread_current();
   list_push_front(&thread_current()->held_locks, &(og_lock->elem));

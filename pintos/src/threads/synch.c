@@ -20,7 +20,7 @@
    PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
    BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
    PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
-   MODIFICATIONS. 
+   MODIFICATIONS.
 */
 
 #include "threads/synch.h"
@@ -310,30 +310,30 @@ lock_release (struct lock *lock)
   struct list *held_locks_list = &(curr_thread->held_locks);
 
   // If this is stuck at negative 1, then we know to set the thread's priority to the og priority
-  int max_priority = -1;
+  int max_priority = curr_thread->og_priority;
 
   // Elements of held_locks_list will be this
   struct list_elem *curr_held_lock_e;
 
   // This outer loop iterates through all held locks
   if (!list_empty(held_locks_list)) {
-    for (curr_held_lock_e = list_begin(held_locks_list); curr_held_lock_e != list_end(held_locks_list); curr_held_lock_e = list_next(curr_held_lock_e))
+    for (curr_held_lock_e = list_begin(held_locks_list); curr_held_lock_e != list_end(held_locks_list);)
     {
       // get waiter list for lock
       struct lock * curr_lock = list_entry(curr_held_lock_e, struct lock, elem);
-      if (lock != curr_lock && max_priority < curr_lock->holder->priority) {
-        max_priority = curr_lock->holder->priority;
+      struct list_elem * biggest = list_max(&curr_lock->semaphore.waiters, priority_comparator, NULL);
+      struct thread * biggest_thread = list_entry(biggest, struct thread, elem);
+      if (lock != curr_lock && max_priority < biggest_thread->priority) {
+        max_priority = biggest_thread->priority;
       }
       if (lock == curr_lock)
-        list_remove(curr_held_lock_e);
+        curr_held_lock_e = list_remove(curr_held_lock_e);
+      else
+        curr_held_lock_e = list_next(curr_held_lock_e);
     }
   }
   // set curr_thread priority to either max_thread or og
-  if (max_priority > curr_thread->og_priority) {
-    curr_thread->priority = max_priority;
-  } else {
-    curr_thread->priority = curr_thread->og_priority;
-  }
+  curr_thread->priority = max_priority;
 
   intr_set_level (old_level);
 
@@ -422,8 +422,11 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
 
   enum intr_level old_level;
   old_level = intr_disable ();
-  if (!list_empty (&cond->waiters))
-    sema_up (&list_entry (list_max (&cond->waiters, priority_cond_comparator, NULL), struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters)) {
+    struct list_elem * tempElem = list_max (&cond->waiters, priority_cond_comparator, NULL);
+    sema_up (&list_entry (tempElem, struct semaphore_elem, elem)->semaphore);
+    list_remove(tempElem);
+  }
   intr_set_level (old_level);
 }
 

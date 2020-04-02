@@ -89,6 +89,9 @@ struct thread
     struct list children_status;      /* List of children as statuses */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    int64_t wakeup;                     /* Time at which to wake up */
+    struct list_elem sleep_elem;
+    struct list_elem lock_acq_elem;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -96,6 +99,16 @@ struct thread
     int fileDesc;
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    // Added by @John. This is the original priority assigned to the thread.
+    int og_priority;
+    // Added by @John. Waiting_lock is the lock the thread is waiting for.
+    struct lock *waiting_lock;
+    // Added by @John. List of locks that the thread is holding.
+    struct list held_locks;
+
+    // Added by @Coby. Stores when a thread should wake up next.
+    int64_t wakeup_mark;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -122,6 +135,7 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+void thread_sleep (void);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);

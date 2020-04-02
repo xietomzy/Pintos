@@ -215,6 +215,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  thread_yield();
   return tid;
 }
 
@@ -266,7 +267,7 @@ thread_sleep (void)
     next_wakeup = curr->wakeup;
   }
   // Add to sleeping list
-  list_push_back (&sleep_list, &thread_current()->elem);
+  list_push_back (&sleep_list, &thread_current()->sleep_elem);
   // Put ourselves to sleep
   thread_block();
   intr_set_level (old_level);
@@ -365,15 +366,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority)
 {
-  intr_disable();
-  thread_current ()->priority = new_priority;
-  struct list_elem *highest_priority_thread_element;
-  highest_priority_thread_element = list_max(&ready_list, priority_comparator, NULL);
-  struct thread *highest_priority_thread = list_entry(highest_priority_thread_element, struct thread, elem);
-  if (highest_priority_thread->priority > new_priority) {
-    thread_yield();
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  thread_current ()->og_priority = new_priority;
+  if (list_empty(&thread_current() -> held_locks) || thread_current ()->priority < new_priority) {
+    thread_current ()->priority = new_priority;
   }
-  intr_enable();
+  intr_set_level (old_level);
+  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -635,20 +635,22 @@ wakeup (void)
   struct list_elem *next;
   int64_t new_wakeup = -1;
   bool high_priority = false;
-  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
-    /* We must get next here, because the thread may be put onto
-       the ready list, which will change e's next. */
-    next = list_next(e);
-    struct thread *t = list_entry(e, struct thread, elem);
-    // Wakeup if time is up
-    if (t->wakeup <= time) {
-      list_remove(e);
-      thread_unblock (t);
-      if (t->priority > curr->priority) {
-        high_priority = true;
+  if (!list_empty(&sleep_list)) {
+    for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = next) {
+      /* We must get next here, because the thread may be put onto
+        the ready list, which will change e's next. */
+      next = list_next(e);
+      struct thread *t = list_entry(e, struct thread, sleep_elem);
+      // Wakeup if time is up
+      if (t->wakeup <= time) {
+        list_remove(e);
+        thread_unblock (t);
+        if (t->priority > curr->priority) {
+          high_priority = true;
+        }
+      } else if (new_wakeup == -1 || t->wakeup < new_wakeup) {
+        new_wakeup = t->wakeup;
       }
-    } else if (new_wakeup == -1 || t->wakeup < new_wakeup) {
-      new_wakeup = t->wakeup;
     }
   }
   //set new min

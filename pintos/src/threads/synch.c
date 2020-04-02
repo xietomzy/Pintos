@@ -246,10 +246,8 @@ lock_acquire (struct lock *lock)
   struct lock* og_lock = lock;
   //Design doc implementation
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
-    // list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
   } else if (curr_thread->priority > lock->holder->priority) { //Our priority is greater than the holder, perform priority donation
-    // list_push_front(&(lock->semaphore.waiters), &(curr_thread->elem));
     curr_thread->waiting_lock = lock;
 
 
@@ -273,7 +271,6 @@ lock_acquire (struct lock *lock)
   intr_set_level (old_level);
   og_lock->holder = thread_current();
   list_push_front(&thread_current()->held_locks, &(og_lock->elem));
-  //list_remove(&(curr_thread->elem));
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -331,11 +328,6 @@ lock_release (struct lock *lock)
         list_remove(curr_held_lock_e);
     }
   }
-  struct list_elem *max_elem = list_max(&(lock->semaphore.waiters), priority_comparator, NULL);
-  struct thread *max_thread_waiter = list_entry(max_elem, struct thread, elem);
-  if (max_priority < max_thread_waiter->priority) {
-    max_priority = max_thread_waiter->priority;
-  }
   // set curr_thread priority to either max_thread or og
   if (max_priority > curr_thread->og_priority) {
     curr_thread->priority = max_priority;
@@ -353,7 +345,6 @@ lock_release (struct lock *lock)
   if (!intr_context ()) {
     thread_yield();
   }
-  //thread_set_priority(curr_thread->priority);
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -408,7 +399,7 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
 
   sema_init (&waiter.semaphore, 0);
-  waiter.thread = lock->holder;
+  waiter.thread = thread_current ();
   list_push_back (&cond->waiters, &waiter.elem);
   lock_release (lock);
   sema_down (&waiter.semaphore);

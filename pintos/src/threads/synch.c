@@ -231,8 +231,12 @@ lock_acquire (struct lock *lock)
     return;
   }
 
-  struct lock* og_lock = lock;
+  //struct lock* og_lock = lock;
   //Design doc implementation
+  struct lock *og_lock = lock;
+  //struct thread *og_curr_thread = curr_thread;
+
+  old_level = intr_disable ();
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
     curr_thread->waiting_lock = lock;
   } else if (curr_thread->priority > lock->holder->priority) { //Our priority is greater than the holder, perform priority donation
@@ -248,6 +252,25 @@ lock_acquire (struct lock *lock)
         curr_thread = lock->holder;
         lock = curr_thread->waiting_lock;
       }
+
+      // if (curr_thread->priority > lock->holder->priority) {
+      //   old_level = intr_disable ();
+      //   lock->holder->priority = curr_thread->priority;
+      //   intr_set_level (old_level);
+      //   curr_thread = lock->holder;
+      //   lock = curr_thread->waiting_lock;
+      // }
+      // if (lock->holder != NULL) {
+      //   if (curr_thread->priority > lock->holder->priority) {
+      //     //old_level = intr_disable ();
+      //     lock->holder->priority = curr_thread->priority;
+      //     //intr_set_level (old_level);
+      //     curr_thread = lock->holder;
+      //     lock = curr_thread->waiting_lock;
+      //   } else {
+      //     break;
+      //   }
+      // }
     }
   }
   old_level = intr_disable ();

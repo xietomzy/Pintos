@@ -255,6 +255,8 @@ lock_acquire (struct lock *lock)
   struct thread *highest_priority_t_of_lock = list_entry(highest_priority_elem, struct thread, elem);*/
 
   //Design doc implementation
+  
+  old_level = intr_disable ();
   if (curr_thread->priority <= lock->holder->priority) { //Current thread's priority less than lock's holder's priority
     list_push_front(&(lock->semaphore.lock_acq_list), &(curr_thread->lock_acq_elem));
     curr_thread->waiting_lock = lock;
@@ -286,32 +288,37 @@ lock_acquire (struct lock *lock)
         struct list_elem *max_elem = list_max(&(lock->semaphore.lock_acq_list), priority_comparator, NULL);
         struct thread *max_thread = list_entry(max_elem, struct thread, lock_acq_elem);
         if (curr_thread->priority > max_thread->priority && curr_thread->priority > lock->holder->priority) {
-          old_level = intr_disable ();
+          //old_level = intr_disable ();
           lock->holder->priority = curr_thread->priority;
-          intr_set_level (old_level);
+          //intr_set_level (old_level);
           curr_thread = lock->holder;
           lock = curr_thread->waiting_lock;
         } else {
           break;
         }
       }
-      if (lock->holder != NULL) {
-        if (curr_thread->priority > lock->holder->priority) {
-          old_level = intr_disable ();
-          lock->holder->priority = curr_thread->priority;
-          intr_set_level (old_level);
-          curr_thread = lock->holder;
-          lock = curr_thread->waiting_lock;
-        } else {
-          break;
-        }
-      }
+
+      
+      // if (lock->holder != NULL) {
+      //   if (curr_thread->priority > lock->holder->priority) {
+      //     //old_level = intr_disable ();
+      //     lock->holder->priority = curr_thread->priority;
+      //     //intr_set_level (old_level);
+      //     curr_thread = lock->holder;
+      //     lock = curr_thread->waiting_lock;
+      //   } else {
+      //     break;
+      //   }
+      // }
     }
 
   }
   
   //Disable interrupts
-  //intr_disable();
+  
+  intr_set_level (old_level);
+
+
   list_remove(&(curr_thread->lock_acq_elem));
   old_level = intr_disable ();
   sema_down(&(lock->semaphore));

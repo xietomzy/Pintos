@@ -88,6 +88,10 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct list_elem sleep_elem;        /* List element for thread_sleep */
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+#endif
     int64_t wakeup;                     /* Time at which to wake up */
     // Added by @John. This is the original priority assigned to the thread.
     int og_priority;

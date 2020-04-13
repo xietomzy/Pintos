@@ -98,6 +98,13 @@ struct inode_disk
     unsigned magic;                     /* Magic number. */
   };
 
+struct inode {
+    ...
+    struct lock dataCheckIn; // for read/write
+    struct condition waitQueue, onDeck; // access queues for read/write
+    int queued = 0, onDeck = 0; // sleeping threads for read/write
+    int curType = 0, numRWing = 0; // current accessor(s) and their type
+}
 
 /* An indirect block that could point to another indirect block or a set of blocks. It will be stored on disk and loaded into memory as needed.
  */
@@ -106,12 +113,17 @@ struct indirect_block {
 }
 ```
 
-In addition, we will be adding a helper function: 
+In addition, we will be adding helper functions: 
 ```c
 bool
 inode_expand (struct inode *, size_t start, size_t sectors);
+
+void
+access (struct inode *, int type);
 ```
-which will expand the inode's data sectors by `sectors` sectors, and return whether or not it was successful in doing so.
+`inode_expand` will expand the inode's data sectors by `sectors` sectors, and return whether or not it was successful in doing so.
+
+`access` will be a helper function limiting access to the inode, explained further in `Algorithms`. `type` is 0 for readers, and 1 for writers.
 
 #### free-map.c/free-map.h
 
@@ -120,7 +132,7 @@ We will be adding a helper function:
 size_t
 free_map_acquire (size_t cnt, block_sector_t *sectorp);
 ```
-which will attempt to allocate up to `cnt` consecutive sectors, writing the first sector it was able to allocate if it acquired any to `sectorp`, and returning how many it acquired. Returns -1 if it failed to acquire any 
+which will attempt to allocate up to `cnt` consecutive sectors, writing the first sector it was able to allocate if it acquired any to `sectorp`, and returning how many it acquired. Returns -1 if it failed to acquire any sectors.
 
 #### bitmap.c
 
@@ -233,26 +245,50 @@ Note that specifying a initial length of zero does work, and does indeed create 
 
 A fairly simple change to this function will be needed. If the `open_cnt` is zero, and the inode is removed, we will need to free up all the data sectors, including the indirect and doubly-indirect data sectors, as well as the index pages themselves.
 
+#### access
+
+This function is essentially identical to Midterm 1 Question 3, and ensures that one and only one of these conditions is true at any given time.
+
+  a. No threads are reading or writing this file
+  b. One or more threads are reading this file
+  c. One thread is writing to this file
+  
+This is accomplished by having an incompatible thread sleep until the queue ahead of it has cleared.
+
+#### inode_read_at
+
+At the start of this function, we will call `access` to ensure that the thread sleeps if a write is in progress.
+
+Because we will be implementing sparse files in `inode_write_at`, we will need to check if the pointer to the sector we are reading from is actually allocated and within the length of the file. If so, we will automatically write out zeroes instead of reading the sector.
+
 #### inode_write_at
 
-We will need to check if a write occurs at an absolute offset beyond the current length of the file. If so, we will then need to determine if that places the offset in the direct, indirect, or doubly-indirect region. Based off of that, we will then call `inode_expand` to expand the requisite number of sectors starting at the offset sector.
+At the start of this function, we will call `access` to ensure that the thread sleeps if a write is in progress.
+
+We will need to check if a write occurs at an absolute offset beyond the current length of the file. If so, we will then need to determine if that places the offset in the direct, indirect, or doubly-indirect region. Based off of that, we will `inode_expand` to expand the requisite number of sectors starting at the offset sector and update the length.
+
+Otherwise, if the sector pointer is zero (indicating it does not exist), manually allocate the sectors we need.
 
 #### free_map_acquire
 
-This function will simply call `bitmap_lazy_scan_and_flip` on its `free_map`, with a mechanism to free the pages if an error occurs, similar to `free_map_allocate`.
+This function will simply call `bitmap_lazy_scan_and_flip` on its `free_map`, with a mechanism to free the pages if an error occurs, similar to `free_map_allocate`, and return the results.
 
-#### bitmap
+#### bitmap_lazy
+
+This function will start at the first value that matches, loop forward until it finds a non-matching value, then return how many values matched and where the start was. Returns `BITMAP_ERROR` if no matching values were found.
 
 
 ### Synchronization:
 
-We don't have to worry about synchronization for `block_read` and `block_write`. We were suggesting that each inode would have a read and a write lock to ensure that no two files can be written to or read from, and then implement these in `inode_read_at` and `inode_write_at`.
+We decided to utilize the solution from Midterm 1, Question 3 to allow multiple readers or one writer to access the inode at a time. 
 
 
 ### Rationale:
-No changes are needed for `inode_read_at`, because our change to `byte_to_sector` mean that the block-by-block iteration of the function will work as expected.
+We felt it necessary to implement helper functions due to the fact that in Project 2, we tried to cram our implementations into one function, and that led to a lot of headaches regarding debugging. By using helper functions, we will be able to write more clear and concise code.
 
-Our implementation of `inode_write_at` implements sparse files
+We do not need a lock for modifying sector pointers because the only time this can happen outside of creation and deletion is due to writing. However, due to the fact that we prevent two writes from occuring simultaneously, we do not need to add a lock.
+
+Our implementation of `inode_write_at` implements sparse files, because we felt that expanding a file shouldn't take more operations than absolutely necessary, and provided that we zero out the index sectors, it should be trivial to identify missing sector pointers.
 
 ## Task 3: Subdirectories
 ### Data Structures and Functions:
@@ -269,6 +305,7 @@ struct thread {
 struct inode_disk {
     ...
     bool directory; // false if a file, true if a direct
+    block_sector_t parent; // need a pointer to the parent directory
     ...
 }
 ```

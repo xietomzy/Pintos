@@ -1,4 +1,4 @@
-Design Document for Project 2: User Programs
+Design Document for Project 3: User Programs
 ============================================
 
 ## Group Members

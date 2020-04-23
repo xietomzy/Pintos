@@ -3,10 +3,6 @@
 
 #include <stddef.h>
 
-/* Include lib/user/stdlib.h or lib/kernel/stdlib.h, as appropriate. */
-#include_next <stdlib.h>
-
-
 /* Standard functions. */
 int atoi (const char *);
 void qsort (void *array, size_t cnt, size_t size,

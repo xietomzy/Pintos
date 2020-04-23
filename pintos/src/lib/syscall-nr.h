@@ -2,9 +2,9 @@
 #define __LIB_SYSCALL_NR_H
 
 /* System call numbers. */
-enum
+enum 
   {
-    /* Projects 1 and later. */
+    /* Projects 2 and later. */
     SYS_HALT,                   /* Halt the operating system. */
     SYS_EXIT,                   /* Terminate this process. */
     SYS_EXEC,                   /* Start another process. */
@@ -20,11 +20,11 @@ enum
     SYS_CLOSE,                  /* Close a file. */
     SYS_PRACTICE,               /* Returns arg incremented by 1 */
 
-    /* Unused. */
+    /* Project 3 and optionally project 4. */
     SYS_MMAP,                   /* Map a file into memory. */
     SYS_MUNMAP,                 /* Remove a memory mapping. */
 
-    /* Project 3 only. */
+    /* Project 4 only. */
     SYS_CHDIR,                  /* Change the current directory. */
     SYS_MKDIR,                  /* Create a directory. */
     SYS_READDIR,                /* Reads a directory entry. */

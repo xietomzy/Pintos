@@ -34,13 +34,13 @@ static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
  
 /* Serializes file system operations. */
-static struct lock fs_lock;
+//static struct lock fs_lock;
  
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  lock_init (&fs_lock);
+  //lock_init (&fs_lock);
 }
  
 /* System call handler. */
@@ -202,9 +202,9 @@ sys_exec (const char *ufile)
   tid_t tid;
   char *kfile = copy_in_string (ufile);
  
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   tid = process_execute (kfile);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   palloc_free_page (kfile);
  
@@ -225,9 +225,9 @@ sys_create (const char *ufile, unsigned initial_size)
   char *kfile = copy_in_string (ufile);
   bool ok;
    
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   ok = filesys_create (kfile, initial_size);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   palloc_free_page (kfile);
  
@@ -241,9 +241,9 @@ sys_remove (const char *ufile)
   char *kfile = copy_in_string (ufile);
   bool ok;
    
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   ok = filesys_remove (kfile);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   palloc_free_page (kfile);
  
@@ -269,7 +269,7 @@ sys_open (const char *ufile)
   fd = malloc (sizeof *fd);
   if (fd != NULL)
     {
-      lock_acquire (&fs_lock);
+      //lock_acquire (&fs_lock);
       fd->file = filesys_open (kfile);
       if (fd->file != NULL)
         {
@@ -279,7 +279,7 @@ sys_open (const char *ufile)
         }
       else 
         free (fd);
-      lock_release (&fs_lock);
+      //lock_release (&fs_lock);
     }
   
   palloc_free_page (kfile);
@@ -314,9 +314,9 @@ sys_filesize (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   int size;
  
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   size = file_length (fd->file);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   return size;
 }
@@ -340,7 +340,7 @@ sys_read (int handle, void *udst_, unsigned size)
 
   /* Handle all other reads. */
   fd = lookup_fd (handle);
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   while (size > 0) 
     {
       /* How much to read into this page? */
@@ -351,7 +351,7 @@ sys_read (int handle, void *udst_, unsigned size)
       /* Check that touching this page is okay. */
       if (!verify_user (udst)) 
         {
-          lock_release (&fs_lock);
+          //lock_release (&fs_lock);
           thread_exit ();
         }
 
@@ -373,7 +373,7 @@ sys_read (int handle, void *udst_, unsigned size)
       udst += retval;
       size -= retval;
     }
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
    
   return bytes_read;
 }
@@ -390,7 +390,7 @@ sys_write (int handle, void *usrc_, unsigned size)
   if (handle != STDOUT_FILENO)
     fd = lookup_fd (handle);
 
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   while (size > 0) 
     {
       /* How much bytes to write to this page? */
@@ -401,7 +401,7 @@ sys_write (int handle, void *usrc_, unsigned size)
       /* Check that we can touch this user page. */
       if (!verify_user (usrc)) 
         {
-          lock_release (&fs_lock);
+          //lock_release (&fs_lock);
           thread_exit ();
         }
 
@@ -429,7 +429,7 @@ sys_write (int handle, void *usrc_, unsigned size)
       usrc += retval;
       size -= retval;
     }
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   return bytes_written;
 }
@@ -440,10 +440,10 @@ sys_seek (int handle, unsigned position)
 {
   struct file_descriptor *fd = lookup_fd (handle);
    
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   if ((off_t) position >= 0)
     file_seek (fd->file, position);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   return 0;
 }
@@ -455,9 +455,9 @@ sys_tell (int handle)
   struct file_descriptor *fd = lookup_fd (handle);
   unsigned position;
    
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   position = file_tell (fd->file);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
  
   return position;
 }
@@ -467,9 +467,9 @@ static int
 sys_close (int handle) 
 {
   struct file_descriptor *fd = lookup_fd (handle);
-  lock_acquire (&fs_lock);
+  //lock_acquire (&fs_lock);
   file_close (fd->file);
-  lock_release (&fs_lock);
+  //lock_release (&fs_lock);
   list_remove (&fd->elem);
   free (fd);
   return 0;
@@ -487,9 +487,9 @@ syscall_exit (void)
       struct file_descriptor *fd;
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
-      lock_acquire (&fs_lock);
+      //lock_acquire (&fs_lock);
       file_close (fd->file);
-      lock_release (&fs_lock);
+      //lock_release (&fs_lock);
       free (fd);
     }
 }

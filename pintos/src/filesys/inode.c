@@ -14,14 +14,25 @@
 /* Number of direct sectors. */
 # define NUM_DIRECT_SECTORS 124
 
+/* An indirect block that could point to another indirect block or a set of blocks.
+ * It will be stored on disk and loaded into memory as needed.
+ */
+struct indirect_block {
+    block_sector_t blocks[128];
+};
+
+struct double_indirect_block {
+  struct indirect_block *indirect_blocks[128];
+};
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
     off_t length;                       /* File size in bytes. */
     block_sector_t direct_sector_ptrs[NUM_DIRECT_SECTORS];        /* Direct data sectors. */
-    block_sector_t ind_blk_ptr;         /* Indirect pointers. */
-    block_sector_t double_ind_blk_ptr;  /* Doubly Indirect pointers. */
+    struct indirect_block *ind_blk_ptr;         /* Indirect pointers. */
+    struct double_indirect_block *double_ind_blk_ptr;  /* Doubly Indirect pointers. */
     unsigned magic;                     /* Magic number. */
   };
 
@@ -53,6 +64,7 @@ struct inode
     int numRWing; // current accessor(s) and their type
   };
 
+
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
@@ -61,21 +73,34 @@ struct inode
 static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
-  // ASSERT (inode != NULL);
-  // if (pos < inode->data.length)
-  //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  // else
-  //   return -1;
+  /* Number of bytes that only direct pointers can handle. */
+  int direct_bytes = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE;
+  /* Number of bytes up to the indirect pointer case. */
+  int indirect_bytes = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE + 
+                             128 * BLOCK_SECTOR_SIZE;
 
   ASSERT (inode != NULL);
+  /* If the offset is less than the length of the file, then we attempt to find the
+   * proper sector */
+  if (pos < inode->data.length) {
+    if (pos < direct_bytes) { // direct pointers
+      return (inode->data.direct_sector_ptrs)[pos / BLOCK_SECTOR_SIZE];
+    } else if (pos < indirect_bytes) { // indirect pointer
+      struct indirect_block *ind_blk = inode->data.ind_blk_ptr;
+      int blk_index = (pos - direct_bytes) / BLOCK_SECTOR_SIZE;
+      return ind_blk->blocks[blk_index];
+    } else { // doubly indirect
+      struct double_indirect_block *d_ind_blk = inode->data.double_ind_blk_ptr;
+      int ind_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE);
+      struct indirect_block *ind_blk = (d_ind_blk->indirect_blocks)[ind_blk_index];
+      int blk_index = (pos - direct_bytes - indirect_bytes) / BLOCK_SECTOR_SIZE;
+      return ind_blk->blocks[blk_index];
+    }
+  }
+  else 
+    return -1;
+  
 
-}
-
-/* An indirect block that could point to another indirect block or a set of blocks.
- * It will be stored on disk and loaded into memory as needed.
- */
-struct indirect_block {
-    block_sector_t blocks[128];
 }
 
 

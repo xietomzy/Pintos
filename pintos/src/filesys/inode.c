@@ -11,14 +11,18 @@
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
 
+/* Number of direct sectors. */
+# define NUM_DIRECT_SECTORS 124
+
 /* On-disk inode.
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
+    block_sector_t direct_sector_ptrs[NUM_DIRECT_SECTORS];        /* Direct data sectors. */
+    block_sector_t ind_blk_ptr;         /* Indirect pointers. */
+    block_sector_t double_ind_blk_ptr;  /* Doubly Indirect pointers. */
     unsigned magic;                     /* Magic number. */
-    uint32_t unused[125];               /* Not used. */
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -38,21 +42,42 @@ struct inode
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
     struct inode_disk data;             /* Inode content. */
+
+    /* Our implementation of inode adds a few more synch tools. */
+    struct lock dataCheckIn; // for read/write
+    struct condition waitQueue;
+    struct condition onDeck; // access queues for read/write
+    int queued;
+    int onDeck; // sleeping threads for read/write
+    int curType;
+    int numRWing; // current accessor(s) and their type
   };
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
-   POS. */
+   POS.
+   We modified this because of our new inode implementation. */
 static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
+  // ASSERT (inode != NULL);
+  // if (pos < inode->data.length)
+  //   return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  // else
+  //   return -1;
+
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
-  else
-    return -1;
+
 }
+
+/* An indirect block that could point to another indirect block or a set of blocks.
+ * It will be stored on disk and loaded into memory as needed.
+ */
+struct indirect_block {
+    block_sector_t blocks[128];
+}
+
 
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */

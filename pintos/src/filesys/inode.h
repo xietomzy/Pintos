@@ -20,4 +20,12 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 
+/* More helper funtions */
+bool
+inode_expand (struct inode *, size_t start, size_t sectors);
+
+void
+access (struct inode *, int type);
+
+
 #endif /* filesys/inode.h */

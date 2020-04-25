@@ -48,4 +48,10 @@ bool bitmap_write (const struct bitmap *, struct file *);
 /* Debugging. */
 void bitmap_dump (const struct bitmap *);
 
+size_t
+bitmap_lazy_scan (const struct bitmap *b, size_t start, size_t cnt, bool value, size_t *len);
+
+size_t
+bitmap_lazy_scan_and_flip (const struct bitmap *b, size_t start, size_t cnt, bool value, size_t *len);
+
 #endif /* lib/kernel/bitmap.h */

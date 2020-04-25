@@ -83,3 +83,12 @@ free_map_create (void)
   if (!bitmap_write (free_map, free_map_file))
     PANIC ("can't write free map");
 }
+
+/* A function that we've added.
+ * Attempt to allocate up to cnt consecutive sectors,
+ * writing the first sector it was able to allocate if it acquired any to sectorp, 
+ * and returning how many it acquired. Returns -1 if it failed to acquire any sectors. */
+size_t
+free_map_acquire(size_t cnt, block_sector_t *sectorp) {
+  
+}

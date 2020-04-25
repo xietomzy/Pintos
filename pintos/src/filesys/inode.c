@@ -64,7 +64,6 @@ struct inode
     int numRWing; // current accessor(s) and their type
   };
 
-
 /* Returns the block device sector that contains byte offset POS
    within INODE.
    Returns -1 if INODE does not contain data for a byte at offset
@@ -99,8 +98,37 @@ byte_to_sector (const struct inode *inode, off_t pos)
   }
   else 
     return -1;
-  
+}
 
+/* Helper function we designed. 
+ * It will expand the INODES's data sectors by sectors SECTORS,
+ * and return whether or not it was successful in doing so. */
+bool inode_expand(struct inode *inode, size_t start, size_t sectors) {
+  static char zeros[BLOCK_SECTOR_SIZE];
+  size_t total = 0;
+  size_t acquired;
+  size_t runs = 0;
+  block_sector_t runps[sectors];
+  size_t run_lens[sectors];
+
+  while (total < sectors) {
+    /* Get next run of free sectors */
+    /* @John I just used free_map_allocate */
+    acquired = free_map_allocate (sectors - total, runps[runs]);
+    run_lens[runs] = acquired;
+    /* Not Included: check for errors.
+     * If error, iterate through runps and run_lens and flip back to free, then return false. */
+    runs++;
+    /* Write zeroes to new sectors */
+    size_t i;
+    for (i = 0; i < acquired; i++) {
+      // Set approriate pointer to sector and write zeroes to disk
+
+      total += acquired;
+    }
+    
+  } 
+  return true;
 }
 
 
@@ -138,6 +166,7 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      block_sector_t run_start;
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           // block_write (fs_device, sector, disk_inode);

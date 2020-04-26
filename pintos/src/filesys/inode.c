@@ -18,11 +18,11 @@
  * It will be stored on disk and loaded into memory as needed.
  */
 struct indirect_block {
-    block_sector_t blocks[128];
+  block_sector_t blocks[128];
 };
 
 struct double_indirect_block {
-  struct indirect_block *indirect_blocks[128];
+  block_sector_t indirect_blocks[128];
 };
 
 /* On-disk inode.
@@ -31,8 +31,8 @@ struct inode_disk
   {
     off_t length;                       /* File size in bytes. */
     block_sector_t direct_sector_ptrs[NUM_DIRECT_SECTORS];        /* Direct data sectors. */
-    struct indirect_block *ind_blk_ptr;         /* Indirect pointers. */
-    struct double_indirect_block *double_ind_blk_ptr;  /* Doubly Indirect pointers. */
+    block_sector_t ind_blk_ptr;         /* Indirect pointers. */
+    block_sector_t double_ind_blk_ptr;  /* Doubly Indirect pointers. */
     unsigned magic;                     /* Magic number. */
   };
 
@@ -100,35 +100,28 @@ byte_to_sector (const struct inode *inode, off_t pos)
     return -1;
 }
 
-/* Helper function we designed. 
- * It will expand the INODES's data sectors by sectors SECTORS,
- * and return whether or not it was successful in doing so. */
-bool inode_expand(struct inode *inode, size_t start, size_t sectors) {
-  static char zeros[BLOCK_SECTOR_SIZE];
-  size_t total = 0;
-  size_t acquired;
-  size_t runs = 0;
-  block_sector_t runps[sectors];
-  size_t run_lens[sectors];
+/* Helper function we took inspiration from last year's disc.
+ * It will resize the INODE to size SIZE bytes. */
+bool inode_resize(struct inode_disk *inode_disk, off_t size) {
+  block_sector_t sector;
+  /* Perform iteration up to the number of direct sectors */
+  for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
 
-  while (total < sectors) {
-    /* Get next run of free sectors */
-    /* @John I just used free_map_allocate */
-    acquired = free_map_allocate (sectors - total, runps[runs]);
-    run_lens[runs] = acquired;
-    /* Not Included: check for errors.
-     * If error, iterate through runps and run_lens and flip back to free, then return false. */
-    runs++;
-    /* Write zeroes to new sectors */
-    size_t i;
-    for (i = 0; i < acquired; i++) {
-      // Set approriate pointer to sector and write zeroes to disk
-
-      total += acquired;
+    if ((size <= BLOCK_SECTOR_SIZE * i) && 
+        (inode_disk->direct_sector_ptrs[i] != 0)) {
+      free_map_release(inode_disk->direct_sector_ptrs[i], 1);
+      inode_disk->direct_sector_ptrs[i] = 0;
     }
-    
-  } 
-  return true;
+    // Somehow, if the previous blocks haven't been allocated, do so here!
+    if ((size > BLOCK_SECTOR_SIZE * i) && 
+        (inode_disk->direct_sector_ptrs[i] == 0)) {
+      bool status = free_map_allocate(1, inode_disk->direct_sector_ptrs[i]);
+      if (!status) {
+        inode_resize(inode_disk, inode_disk->length);
+        return false;
+      }
+    }
+  }
 }
 
 
@@ -170,6 +163,7 @@ inode_create (block_sector_t sector, off_t length)
       if (free_map_allocate (sectors, &disk_inode->start)) 
         {
           // block_write (fs_device, sector, disk_inode);
+
           cache_write (fs_device, sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
           if (sectors > 0) 
             {

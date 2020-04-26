@@ -101,12 +101,12 @@ byte_to_sector (const struct inode *inode, off_t pos)
 }
 
 /* Helper function we took inspiration from last year's disc.
- * It will resize the INODE to size SIZE bytes. */
+ * It will resize the INODE to size SIZE bytes, and sets the length
+ * member accordingly. */
 bool inode_resize(struct inode_disk *inode_disk, off_t size) {
   block_sector_t sector;
   /* Perform iteration up to the number of direct sectors */
   for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
-
     if ((size <= BLOCK_SECTOR_SIZE * i) && 
         (inode_disk->direct_sector_ptrs[i] != 0)) {
       free_map_release(inode_disk->direct_sector_ptrs[i], 1);
@@ -115,13 +115,52 @@ bool inode_resize(struct inode_disk *inode_disk, off_t size) {
     // Somehow, if the previous blocks haven't been allocated, do so here!
     if ((size > BLOCK_SECTOR_SIZE * i) && 
         (inode_disk->direct_sector_ptrs[i] == 0)) {
-      bool status = free_map_allocate(1, inode_disk->direct_sector_ptrs[i]);
+      bool status = free_map_allocate(1, &(inode_disk->direct_sector_ptrs[i]));
       if (!status) {
         inode_resize(inode_disk, inode_disk->length);
         return false;
       }
     }
   }
+  
+  // Success case:
+  if (inode_disk->ind_blk_ptr == 0 && size < NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE) {
+    inode_disk->length = size;
+    return true;
+  }
+
+  block_sector_t buffer[128];
+
+  if (inode_disk->ind_blk_ptr == 0) {
+    memset(buffer, 0, BLOCK_SECTOR_SIZE);
+    bool status = free_map_allocate(1, &(inode_disk->ind_blk_ptr));
+    if (!status) {
+      inode_resize(inode_disk, size);
+      return false;
+    }
+  } else { // Read the contents into the buffer
+    block_read(fs_device, inode_disk->ind_blk_ptr, buffer);
+  }
+
+  for (int i = 0; i < 128; i ++) {
+    if (size <= (12 + i) * BLOCK_SECTOR_SIZE && buffer[i] != 0) {
+      free_map_release(buffer[i], 1);
+      buffer[i] = 0;
+    }
+    // Somehow, if the previous blocks haven't been allocated, do so here!
+    if ((size > (12 + i) * BLOCK_SECTOR_SIZE) && buffer[i] == 0) {
+      bool status = free_map_allocate(1, &(buffer[i]));
+      if (!status) {
+        inode_resize(inode_disk, inode_disk->length);
+        return false;
+      }
+    }
+  }
+
+  // Success case:
+  block_write(fs_device, inode_disk->ind_blk_ptr, buffer);
+  inode_disk->length = size;
+  return true;
 }
 
 

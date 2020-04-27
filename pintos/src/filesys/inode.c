@@ -337,6 +337,37 @@ inode_get_inumber (const struct inode *inode)
   return inode->sector;
 }
 
+/* Closes all of the direct pointers. */
+void 
+inode_close_dir_ptrs (struct inode *inode) {
+  struct inode_disk *inode_data = &(inode->data);
+  for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
+    free_map_release(inode_data->direct_sector_ptrs[i], 1);
+    inode_data->direct_sector_ptrs[i] = 0;
+  }
+}
+
+/* Closes the indirect pointer. */
+void 
+inode_close_indir_ptr (block_sector_t indirect_block) {
+  block_sector_t buffer[128];
+  cache_read(fs_device, indirect_block, buffer, 0, BLOCK_SECTOR_SIZE);
+  for (int i = 0; i < 128; i ++) {
+    free_map_release(buffer[i], 1);
+  }
+}
+
+/* Closes the direct pointer. */
+void 
+inode_close_double_indir_ptr (block_sector_t double_indirect_block) {
+  block_sector_t buffer[128];
+  cache_read(fs_device, double_indirect_block, buffer, 0, BLOCK_SECTOR_SIZE);
+  for (int i = 0; i < 128; i ++) {
+    inode_close_indir_ptr(buffer[i]);
+    free_map_release(buffer[i], 1);
+  }
+}
+
 /* Closes INODE and writes it to disk.
    If this was the last reference to INODE, frees its memory.
    If INODE was also a removed inode, frees its blocks. */

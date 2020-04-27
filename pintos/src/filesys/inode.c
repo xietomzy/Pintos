@@ -12,7 +12,12 @@
 #define INODE_MAGIC 0x494e4f44
 
 /* Number of direct sectors. */
-# define NUM_DIRECT_SECTORS 124
+#define NUM_DIRECT_SECTORS 124
+
+/* A couple of synchronization global locks. */
+struct lock open_inodes_lock;
+struct lock global_freemap_lock;
+struct condition monitor_file_deny;
 
 /* An indirect block that could point to another indirect block or a set of blocks.
  * It will be stored on disk and loaded into memory as needed.
@@ -56,6 +61,8 @@ struct inode
 
     /* Our implementation of inode adds a few more synch tools. */
     struct lock dataCheckIn; // for read/write
+    struct lock metadata_lock;
+    struct lock resize_lock; // for resizing and writing 
     struct condition waitQueue;
     struct condition onDeck; // access queues for read/write
     int queued;
@@ -63,6 +70,12 @@ struct inode
     int curType;
     int numRWing; // current accessor(s) and their type
   };
+
+void
+access (struct inode *inode, int type)
+{
+
+}
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
@@ -85,15 +98,21 @@ byte_to_sector (const struct inode *inode, off_t pos)
     if (pos < direct_bytes) { // direct pointers
       return (inode->data.direct_sector_ptrs)[pos / BLOCK_SECTOR_SIZE];
     } else if (pos < indirect_bytes) { // indirect pointer
-      struct indirect_block *ind_blk = inode->data.ind_blk_ptr;
+      block_sector_t buffer[128];
+      cache_read(fs_device, inode->data.ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
+      // struct indirect_block *ind_blk = inode->data.ind_blk_ptr;
       int blk_index = (pos - direct_bytes) / BLOCK_SECTOR_SIZE;
-      return ind_blk->blocks[blk_index];
+      return buffer[blk_index];
     } else { // doubly indirect
-      struct double_indirect_block *d_ind_blk = inode->data.double_ind_blk_ptr;
+      block_sector_t buffer[128];
+      // struct double_indirect_block *d_ind_blk = inode->data.double_ind_blk_ptr;
+      cache_read(fs_device, inode->data.double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
       int ind_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE);
-      struct indirect_block *ind_blk = (d_ind_blk->indirect_blocks)[ind_blk_index];
+      block_sector_t ind_buffer[128];
+      // struct indirect_block *ind_blk = (d_ind_blk->indirect_blocks)[ind_blk_index];
+      cache_read(fs_device, ind_buffer[ind_blk_index], ind_buffer, 0, BLOCK_SECTOR_SIZE);
       int blk_index = (pos - direct_bytes - indirect_bytes) / BLOCK_SECTOR_SIZE;
-      return ind_blk->blocks[blk_index];
+      return ind_buffer[blk_index];
     }
   }
   else 
@@ -118,7 +137,12 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
 /* Helper function we took inspiration from last year's disc.
  * It will resize the INODE to size SIZE bytes, and sets the length
  * member accordingly. Automatically calls cache_write, but
- * be sure to cache INODE_DISK in the caller! */
+ * be sure to cache INODE_DISK in the caller!
+ * Furthermore, be sure that after acquiring the inode's resizing lock
+ * to check whether or not another thread already resized the inode during
+ * the period of time in which the current thread saw the need to
+ * resize the inode and when the current thread acquired the resize lock.
+ * Also frees the lock acquired by the initial inode. */
 bool inode_resize(struct inode_disk *inode_disk, off_t size) {
   block_sector_t sector;
   /* Perform iteration up to the number of direct sectors */
@@ -238,6 +262,12 @@ void
 inode_init (void) 
 {
   list_init (&open_inodes);
+
+  /* Initialize the global locks. */
+  lock_init(&open_inodes_lock);
+  lock_init(&global_freemap_lock);
+
+  cond_init(&monitor_file_deny);
 }
 
 /* Initializes an inode with LENGTH bytes of data and
@@ -264,6 +294,7 @@ inode_create (block_sector_t sector, off_t length)
       disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
       block_sector_t run_start;
+      
       if (inode_resize(disk_inode, length)) 
         {
           // block_write (fs_device, sector, disk_inode);
@@ -316,6 +347,11 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  
+  /* Initialize locks. */
+  lock_init(&(inode->metadata_lock));
+  lock_init(&(inode->resize_lock));
+
   // block_read (fs_device, inode->sector, &inode->data);
   cache_read (fs_device, inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
   return inode;

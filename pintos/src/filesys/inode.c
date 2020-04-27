@@ -388,8 +388,12 @@ inode_close (struct inode *inode)
       if (inode->removed) 
         {
           free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
+          // free_map_release (inode->data.start,
+          //                   bytes_to_sectors (inode->data.length)); 
+          // MAY NEED TO ZERO CHECK THESE FUNCTIONS
+          inode_close_dir_ptrs(inode);
+          inode_close_indir_ptr(inode->data.ind_blk_ptr);
+          inode_close_double_indir_ptr(inode->data.double_ind_blk_ptr);
         }
 
       free (inode); 

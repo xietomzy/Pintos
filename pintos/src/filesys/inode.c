@@ -106,6 +106,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
 void flush_indirect_block(block_sector_t indirect_block_ptr) {
   // This is an indirect_block pointer
   block_sector_t buffer[128];
+  memset(buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
     if (buffer[i] != 0) {
       free_map_release(buffer[i], 1);
@@ -116,7 +117,8 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
 
 /* Helper function we took inspiration from last year's disc.
  * It will resize the INODE to size SIZE bytes, and sets the length
- * member accordingly. */
+ * member accordingly. Automatically calls cache_write, but
+ * be sure to cache INODE_DISK in the caller! */
 bool inode_resize(struct inode_disk *inode_disk, off_t size) {
   block_sector_t sector;
   /* Perform iteration up to the number of direct sectors */
@@ -259,23 +261,22 @@ inode_create (block_sector_t sector, off_t length)
   if (disk_inode != NULL)
     {
       size_t sectors = bytes_to_sectors (length);
-      disk_inode->length = length;
+      disk_inode->length = 0;
       disk_inode->magic = INODE_MAGIC;
       block_sector_t run_start;
-      if (free_map_allocate (sectors, &disk_inode->start)) 
+      if (inode_resize(disk_inode, length)) 
         {
           // block_write (fs_device, sector, disk_inode);
-
           cache_write (fs_device, sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
-          if (sectors > 0) 
-            {
-              static char zeros[BLOCK_SECTOR_SIZE];
-              size_t i;
+          // if (sectors > 0) 
+          //   {
+          //     static char zeros[BLOCK_SECTOR_SIZE];
+          //     size_t i;
               
-              for (i = 0; i < sectors; i++) 
-                // block_write (fs_device, disk_inode->start + i, zeros);
-                cache_write (fs_device, disk_inode->start + i, zeros, 0, BLOCK_SECTOR_SIZE);
-            }
+          //     for (i = 0; i < sectors; i++) 
+          //       // block_write (fs_device, disk_inode->start + i, zeros);
+          //       cache_write (fs_device, disk_inode->start + i, zeros, 0, BLOCK_SECTOR_SIZE);
+          //   }
           success = true; 
         } 
       free (disk_inode);

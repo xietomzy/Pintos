@@ -67,12 +67,13 @@ struct inode
     struct condition onDeckQueue; // access queues for read/write
     int queued; // num queued threads
     int onDeck; // sleeping threads for read/write
-    int curType;
+    int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s) and their type
   };
 
 /* Called by access methods to this inode before actually
-   accessing or modifying any data within the inode. */
+   accessing or modifying any data within the inode. 
+   Type 0 is reading, and type 1 is writing. */
 void
 access (struct inode *inode, int type)
 {
@@ -82,16 +83,19 @@ access (struct inode *inode, int type)
   if (inode->queued + inode->onDeck > 0)
   {
     inode->queued++;
-    // inode->waitQueue.wait();
+    cond_wait(&(inode->waitQueue), &(inode->dataCheckIn));
     inode->queued--;
   }
 
   while ((inode->numRWing > 0) && (type == 1 || inode->curType == 1))
   {
-    inode->onDeck++;
-    // inode->onDeckQueue.wait();
-    inode->onDeck--;
+    (inode->onDeck)++;
+    cond_wait(&(inode->onDeckQueue), &(inode->dataCheckIn));
+    (inode->onDeck)--;
   }
+
+  // Complete check-in
+  lock_release(&(inode->dataCheckIn));
 }
 
 /* Called by access methods to this inode after
@@ -100,13 +104,10 @@ access (struct inode *inode, int type)
 void
 checkout (struct inode *inode)
 {
-  // inode->dataCheckIn.acquire();
-  // inode->numRWing--;
-  // inode->onDeckQueue.signal();
-  // inode->dataCheckIn.release();
-  cond_wait(&(inode->onDeckQueue), &(inode->dataCheckIn));
+  lock_acquire(&(inode->dataCheckIn));
   (inode->numRWing) --;
   cond_signal(&(inode->onDeckQueue), &(inode->dataCheckIn));
+  lock_release(&(inode->dataCheckIn));
 }
 
 /* Returns the block device sector that contains byte offset POS
@@ -176,6 +177,7 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
  * resize the inode and when the current thread acquired the resize lock.
  * Also frees the lock acquired by the initial inode. */
 bool inode_resize(struct inode_disk *inode_disk, off_t size) {
+  ac
   block_sector_t sector;
   /* Perform iteration up to the number of direct sectors */
   for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
@@ -510,6 +512,7 @@ inode_remove (struct inode *inode)
 off_t
 inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
+  access(inode, 0);
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
   //uint8_t *bounce = NULL;
@@ -557,7 +560,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       bytes_read += chunk_size;
     }
   //free (bounce);
-
+  
+  checkout(inode);
   return bytes_read;
 }
 
@@ -570,6 +574,7 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
+  access(inode, 1);
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
   //uint8_t *bounce = NULL;
@@ -627,6 +632,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
   //free (bounce);
 
+  checkout(inode);
   return bytes_written;
 }
 

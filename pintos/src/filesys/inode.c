@@ -420,6 +420,10 @@ inode_close_dir_ptrs (struct inode *inode) {
 void
 inode_close_indir_ptr (struct inode *inode) {
   block_sector_t buffer[128];
+
+  if (inode->data.ind_blk_ptr == 0) {
+    return;
+  }
   cache_read(fs_device, inode->data.ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
     if (buffer[i] != 0) {
@@ -445,6 +449,10 @@ close_indir_ptr (block_sector_t block) {
 void
 inode_close_double_indir_ptr (struct inode *inode) {
   block_sector_t buffer[128];
+
+  if (inode->data.double_ind_blk_ptr == 0) {
+    return;
+  }
   cache_read(fs_device, inode->data.double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
     if (buffer[i] != 0) {

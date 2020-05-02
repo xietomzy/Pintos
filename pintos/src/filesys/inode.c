@@ -77,19 +77,19 @@ void
 access (struct inode *inode, int type)
 {
   // Check-in
-  inode->dataCheckIn.acquire();
+  lock_acquire(&(inode->dataCheckIn));
 
   if (inode->queued + inode->onDeck > 0)
   {
     inode->queued++;
-    inode->waitQueue.wait();
+    // inode->waitQueue.wait();
     inode->queued--;
   }
 
   while ((inode->numRWing > 0) && (type == 1 || inode->curType == 1))
   {
     inode->onDeck++;
-    inode->onDeckQueue.wait();
+    // inode->onDeckQueue.wait();
     inode->onDeck--;
   }
 }
@@ -98,12 +98,15 @@ access (struct inode *inode, int type)
    all data is accessed. Failure to call this method
    will result in this inode being inaccessible. */
 void
-checkout (struct inode *indoe)
+checkout (struct inode *inode)
 {
-  inode->dataCheckIn.acquire();
-  inode->numRWing--;
-  inode->onDeckQueue.signal();
-  inode->dataCheckIn.release();
+  // inode->dataCheckIn.acquire();
+  // inode->numRWing--;
+  // inode->onDeckQueue.signal();
+  // inode->dataCheckIn.release();
+  cond_wait(&(inode->onDeckQueue), &(inode->dataCheckIn));
+  (inode->numRWing) --;
+  cond_signal(&(inode->onDeckQueue), &(inode->dataCheckIn));
 }
 
 /* Returns the block device sector that contains byte offset POS
@@ -229,7 +232,7 @@ bool inode_resize(struct inode_disk *inode_disk, off_t size) {
     return true;
   }
 
-  block_sector_t buffer[128];
+  // block_sector_t buffer[128];
 
   // If we haven't set our indirect block pointer
   if (inode_disk->double_ind_blk_ptr == 0) {
@@ -295,7 +298,6 @@ inode_init (void)
   /* Initialize the global locks. */
   lock_init(&open_inodes_lock);
   lock_init(&global_freemap_lock);
-
   cond_init(&monitor_file_deny);
 }
 
@@ -407,30 +409,50 @@ void
 inode_close_dir_ptrs (struct inode *inode) {
   struct inode_disk *inode_data = &(inode->data);
   for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
-    free_map_release(inode_data->direct_sector_ptrs[i], 1);
-    inode_data->direct_sector_ptrs[i] = 0;
+    if (inode_data->direct_sector_ptrs[i] != 0) {
+      free_map_release(inode_data->direct_sector_ptrs[i], 1);
+      inode_data->direct_sector_ptrs[i] = 0;
+    }
   }
 }
 
-/* Closes the indirect pointer. */
+/* Closes the indirect pointer, and sets the inode's indirect_block pointer to 0. */
 void
-inode_close_indir_ptr (block_sector_t indirect_block) {
+inode_close_indir_ptr (struct inode *inode) {
   block_sector_t buffer[128];
-  cache_read(fs_device, indirect_block, buffer, 0, BLOCK_SECTOR_SIZE);
+  cache_read(fs_device, inode->data.ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
-    free_map_release(buffer[i], 1);
+    if (buffer[i] != 0) {
+      free_map_release(buffer[i], 1);
+    }
+  }
+  inode->data.ind_blk_ptr = 0;
+}
+
+/* Frees up every single pointer within block, which we assume to be an indirect pointer. */
+void 
+close_indir_ptr (block_sector_t block) {
+  block_sector_t buffer[128];
+  cache_read(fs_device, block, buffer, 0, BLOCK_SECTOR_SIZE);
+  for (int i = 0; i < 128; i ++) {
+    if (buffer[i] != 0) {
+      free_map_release(buffer[i], 1);
+    }
   }
 }
 
 /* Closes the direct pointer. */
 void
-inode_close_double_indir_ptr (block_sector_t double_indirect_block) {
+inode_close_double_indir_ptr (struct inode *inode) {
   block_sector_t buffer[128];
-  cache_read(fs_device, double_indirect_block, buffer, 0, BLOCK_SECTOR_SIZE);
+  cache_read(fs_device, inode->data.double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
-    inode_close_indir_ptr(buffer[i]);
-    free_map_release(buffer[i], 1);
+    if (buffer[i] != 0) {
+      close_indir_ptr(buffer[i]);
+      free_map_release(buffer[i], 1);
+    }
   }
+  inode->data.double_ind_blk_ptr = 0;
 }
 
 /* Closes INODE and writes it to disk.
@@ -457,8 +479,8 @@ inode_close (struct inode *inode)
           //                   bytes_to_sectors (inode->data.length));
           // MAY NEED TO ZERO CHECK THESE FUNCTIONS
           inode_close_dir_ptrs(inode);
-          inode_close_indir_ptr(inode->data.ind_blk_ptr);
-          inode_close_double_indir_ptr(inode->data.double_ind_blk_ptr);
+          inode_close_indir_ptr(inode);
+          inode_close_double_indir_ptr(inode);
         }
 
       free (inode);

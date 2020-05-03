@@ -32,3 +32,5 @@ void cache_init (void);
 void cache_read (struct block *block, block_sector_t sector, void *buffer, off_t offset, int chunk_size);
 void cache_write (struct block *block, block_sector_t sector, const void *buffer, off_t offset, int chunk_size);
 void cache_flush (void);
+int num_cache_hits(void);
+int num_cache_accesses(void);

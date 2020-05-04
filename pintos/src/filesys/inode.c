@@ -83,7 +83,7 @@ struct inode
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s) and their type
 
-    uint32_t unused[90];
+    uint32_t unused[102];
 
     unsigned magic;                     /* Magic number. */
   };

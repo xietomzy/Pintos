@@ -357,10 +357,6 @@ inode_create (block_sector_t sector, off_t length)
       node->length = 0;
       node->magic = INODE_MAGIC;
       bool data_status = free_map_allocate(1, &(node->sector));
-      /* Initialize locks. */
-      lock_init(&(node->dataCheckIn));
-      cond_init(&(node->waitQueue));
-      cond_init(&(node->onDeckQueue));
 
       if (!data_status) {
         return false;
@@ -422,6 +418,10 @@ inode_open (block_sector_t sector)
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
+  /* Initialize locks. */
+  lock_init(&(inode->dataCheckIn));
+  cond_init(&(inode->waitQueue));
+  cond_init(&(inode->onDeckQueue));
 
   // block_read (fs_device, inode->sector, &inode->data);
   /* First, allocate a block for data. */

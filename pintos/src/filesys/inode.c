@@ -12,7 +12,7 @@
 #define INODE_MAGIC 0x494e4f44
 
 /* Number of direct sectors. */
-#define NUM_DIRECT_SECTORS 88
+#define NUM_DIRECT_SECTORS 124
 
 /* A couple of synchronization global locks. */
 struct lock open_inodes_lock;
@@ -75,6 +75,8 @@ struct inode
     int onDeck; // sleeping threads for read/write
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s) and their type
+
+    uint32_t unused[89];
 
     unsigned magic;                     /* Magic number. */
   };
@@ -198,6 +200,7 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
  * Also frees the lock acquired by the initial inode. */
 bool inode_resize(struct inode *inode, off_t size) {
   struct inode_disk inode_disk;
+  ASSERT (sizeof(inode_disk) == BLOCK_SECTOR_SIZE);
   cache_read(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
 
   block_sector_t sector;
@@ -321,7 +324,6 @@ void
 inode_init (void)
 {
   list_init (&open_inodes);
-
   /* Initialize the global locks. */
   lock_init(&open_inodes_lock);
   lock_init(&global_freemap_lock);
@@ -352,9 +354,17 @@ inode_create (block_sector_t sector, off_t length)
       node->length = 0;
       node->magic = INODE_MAGIC;
       bool data_status = free_map_allocate(1, &(node->data));
+      /* Initialize locks. */
+      lock_init(&(node->dataCheckIn));
+      lock_init(&(node->metadata_lock));
+      lock_init(&(node->resize_lock));
+      cond_init(&(node->waitQueue));
+      cond_init(&(node->onDeckQueue));
+
       if (!data_status) {
         return false;
       }
+
       block_sector_t run_start;
 
       if (inode_resize(node, length))
@@ -412,9 +422,7 @@ inode_open (block_sector_t sector)
   inode->deny_write_cnt = 0;
   inode->removed = false;
 
-  /* Initialize locks. */
-  lock_init(&(inode->metadata_lock));
-  lock_init(&(inode->resize_lock));
+
 
   // block_read (fs_device, inode->sector, &inode->data);
   cache_read (fs_device, inode->sector, inode, 0, BLOCK_SECTOR_SIZE);

@@ -14,6 +14,11 @@
 /* Number of direct sectors. */
 #define NUM_DIRECT_SECTORS 124
 
+
+/* List of open inodes, so that opening a single inode twice
+   returns the same `struct inode'. */
+static struct list open_inodes;
+
 /* A couple of synchronization global locks. */
 struct lock open_inodes_lock;
 struct lock global_freemap_lock;
@@ -314,11 +319,6 @@ bool inode_resize(struct inode *inode, off_t size) {
   return true;
 }
 
-
-/* List of open inodes, so that opening a single inode twice
-   returns the same `struct inode'. */
-static struct list open_inodes;
-
 /* Initializes the inode module. */
 void
 inode_init (void)
@@ -423,9 +423,10 @@ inode_open (block_sector_t sector)
   inode->removed = false;
 
 
-
+ 
   // block_read (fs_device, inode->sector, &inode->data);
-  cache_read (fs_device, inode->sector, inode, 0, BLOCK_SECTOR_SIZE);
+  struct inode_disk inode_disk;
+  cache_read (fs_device, inode->sector, inode->data, 0, BLOCK_SECTOR_SIZE);
   ASSERT(inode != NULL);
   return inode;
 }

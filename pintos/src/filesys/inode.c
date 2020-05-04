@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <round.h>
 #include <string.h>
+#include <stdio.h>
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "threads/malloc.h"
@@ -13,6 +14,10 @@
 
 /* Number of direct sectors. */
 #define NUM_DIRECT_SECTORS 124
+
+void checkout(struct inode *inode);
+void flush_indirect_block(block_sector_t indirect_block_ptr);
+bool inode_resize(struct inode *inode, off_t size);
 
 
 /* List of open inodes, so that opening a single inode twice
@@ -63,7 +68,10 @@ struct inode
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+<<<<<<< Updated upstream
     // block_sector_t data;                /* Inode disk content. */
+=======
+>>>>>>> Stashed changes
 
     off_t length;                       /* File size in bytes. */
     // block_sector_t direct_sector_ptrs[NUM_DIRECT_SECTORS];        /* Direct data sectors. */

@@ -68,10 +68,6 @@ struct inode
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-<<<<<<< Updated upstream
-    // block_sector_t data;                /* Inode disk content. */
-=======
->>>>>>> Stashed changes
 
     off_t length;                       /* File size in bytes. */
     // block_sector_t direct_sector_ptrs[NUM_DIRECT_SECTORS];        /* Direct data sectors. */
@@ -80,8 +76,6 @@ struct inode
 
     /* Our implementation of inode adds a few more synch tools. */
     struct lock dataCheckIn; // for read/write
-    struct lock metadata_lock;
-    struct lock resize_lock; // for resizing and writing
     struct condition waitQueue;
     struct condition onDeckQueue; // access queues for read/write
     int queued; // num queued threads
@@ -89,7 +83,7 @@ struct inode
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s) and their type
 
-    uint32_t unused[90];
+    uint32_t unused[102];
 
     unsigned magic;                     /* Magic number. */
   };
@@ -365,8 +359,6 @@ inode_create (block_sector_t sector, off_t length)
       bool data_status = free_map_allocate(1, &(node->sector));
       /* Initialize locks. */
       lock_init(&(node->dataCheckIn));
-      lock_init(&(node->metadata_lock));
-      lock_init(&(node->resize_lock));
       cond_init(&(node->waitQueue));
       cond_init(&(node->onDeckQueue));
 

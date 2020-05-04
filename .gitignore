@@ -2,7 +2,8 @@
 *.pyc
 *.swp
 *~
-.DS_Store
+._.DS_Store
 pintos/**/build
 remove_files.txt
 pintos/src/userprog/filesys.dsk
+.vscode/

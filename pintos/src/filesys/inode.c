@@ -425,10 +425,10 @@ inode_open (block_sector_t sector)
 
   // block_read (fs_device, inode->sector, &inode->data);
   /* First, allocate a block for data. */
-  bool status = free_map_allocate(1, &(inode->sector));
+  // bool status = free_map_allocate(1, &(inode->sector));
   // inode->sector = sector;
   // cache_read (fs_device, inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
-  ASSERT(inode != NULL);
+  // ASSERT(inode != NULL);
   return inode; 
 }
 

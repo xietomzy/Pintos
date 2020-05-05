@@ -269,9 +269,9 @@ bool inode_resize(struct inode *inode, off_t size) {
   int size_check_double = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE + (128 * BLOCK_SECTOR_SIZE);
   // Success case:
   if (inode_disk->double_ind_blk_ptr == 0 && size < size_check_double) {
+    inode_disk->length = size;
     cache_write(fs_device, inode_disk->ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
     cache_write(fs_device, inode->data, inode_disk, 0, BLOCK_SECTOR_SIZE);
-    inode_disk->length = size;
     return true;
   }
 
@@ -322,9 +322,9 @@ bool inode_resize(struct inode *inode, off_t size) {
     }
   }
   // Success case:
+  inode_disk->length = size;
   cache_write(fs_device, inode_disk->double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   cache_write(fs_device, inode->data, inode_disk, 0, BLOCK_SECTOR_SIZE);
-  inode_disk->length = size;
   return true;
 }
 

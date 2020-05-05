@@ -399,9 +399,6 @@ inode_open (block_sector_t sector)
         {
           inode_reopen (inode);
           lock_release(&open_inodes_lock);
-          lock_acquire(&(inode->open_cnt_lock));
-          inode->open_cnt ++;
-          lock_release(&(inode->open_cnt_lock));
           return inode;
         }
     }
@@ -411,16 +408,13 @@ inode_open (block_sector_t sector)
   if (inode == NULL)
     return NULL;
 
+  cache_read (fs_device, sector, inode, 0, BLOCK_SECTOR_SIZE);
+
   /* Initialize. */
-  inode->sector = sector;
   inode->open_cnt = 1;
   inode->deny_write_cnt = 0;
   inode->removed = false;
 
-
-  cache_read (fs_device, sector, inode, 0, BLOCK_SECTOR_SIZE);
-
-  /* Initialize locks. */
   lock_init(&(inode->dataCheckIn));
   lock_init(&(inode->open_cnt_lock));
   cond_init(&(inode->waitQueue));
@@ -436,7 +430,9 @@ struct inode *
 inode_reopen (struct inode *inode)
 {
   if (inode != NULL)
+    lock_acquire(&(inode->open_cnt_lock));
     inode->open_cnt++;
+    lock_release(&(inode->open_cnt_lock));
   return inode;
 }
 

@@ -137,6 +137,8 @@ byte_to_sector (const struct inode *inode, off_t pos)
   int indirect_bytes = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE +
                              128 * BLOCK_SECTOR_SIZE;
 
+  int return_val = -1;
+
   ASSERT (inode != NULL);
 
   struct inode_disk *data = malloc(BLOCK_SECTOR_SIZE);
@@ -149,38 +151,38 @@ byte_to_sector (const struct inode *inode, off_t pos)
    * proper sector */
   if (pos < data->length) {
     if (pos < direct_bytes) { // direct pointers
-      free(data);
-      return (data->direct_sector_ptrs)[pos / BLOCK_SECTOR_SIZE];
+      return_val = (data->direct_sector_ptrs)[pos / BLOCK_SECTOR_SIZE];
+      goto cleanup;
     } else if (pos < indirect_bytes) { // indirect pointer
-      block_sector_t buffer[128];
+      block_sector_t (*buffer)[128] = malloc(128 * sizeof (block_sector_t));
       if (data->ind_blk_ptr == 0) {
         PANIC("No indirect block allocated");
       }
       cache_read(fs_device, data->ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
       // struct indirect_block *ind_blk = inode->data.ind_blk_ptr;
       int blk_index = (pos - direct_bytes) / BLOCK_SECTOR_SIZE;
-      free(data);
-      return buffer[blk_index];
+      return_val = (*buffer)[blk_index];
+      free(buffer);
+      goto cleanup;
     } else { // doubly indirect
-      block_sector_t buffer[128];
-      // struct double_indirect_block *d_ind_blk = inode->data.double_ind_blk_ptr;
+      block_sector_t (*buffer)[128] = malloc(128 * sizeof (block_sector_t));
       if (data->double_ind_blk_ptr == 0) {
         PANIC("No doubly direct block allocated");
       }
       cache_read(fs_device, data->double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
       int ind_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE);
-      block_sector_t ind_buffer[128];
-      // struct indirect_block *ind_blk = (d_ind_blk->indirect_blocks)[ind_blk_index];
+      block_sector_t (*ind_buffer)[128] = malloc(128 * sizeof(block_sector_t));
       cache_read(fs_device, ind_buffer[ind_blk_index], ind_buffer, 0, BLOCK_SECTOR_SIZE);
       int blk_index = (pos - direct_bytes - indirect_bytes) / BLOCK_SECTOR_SIZE;
-      free(data);
-      return ind_buffer[blk_index];
+      return_val = ind_buffer[blk_index];
+      free(ind_buffer);
+      free(buffer);
+      goto cleanup;
     }
   }
-  else {
+  cleanup:
     free(data);
-    return -1;
-  }
+    return return_val;
 }
 
 /* Helper function for inode_resize. Assumes that INDIRECT_BLOCK_PTR

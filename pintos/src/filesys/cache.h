@@ -30,5 +30,5 @@ struct cache_block cache[MAX_CACHE_BLOCKS];
 void cache_init (void);
 /* Cache read/write similar to block read/write */
 void cache_read (struct block *block, block_sector_t sector, void *buffer, off_t offset, int chunk_size);
-void cache_write (struct block *block, block_sector_t sector, void *buffer, off_t offset, int chunk_size);
+void cache_write (struct block *block, block_sector_t sector, const void *buffer, off_t offset, int chunk_size);
 void cache_flush (void);

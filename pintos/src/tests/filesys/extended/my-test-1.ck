@@ -8,7 +8,7 @@ check_expected (IGNORE_EXIT_CODES => 1, [<<'EOF']);
 (my-test-1) create "logfile"
 (my-test-1) open "logfile"
 (my-test-1) Number of bytes read: 4096
-(my-test-1) Number of bytes read: 8
-
+(my-test-1) Number of cache hits: 8
+(my-test-1) open "logfile"
 EOF
 pass;

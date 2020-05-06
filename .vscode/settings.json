@@ -1,5 +1,6 @@
 {
     "files.associations": {
+<<<<<<< HEAD
         "interrupt.h": "c",
         "palloc.h": "c",
         "algorithm": "c",
@@ -7,6 +8,9 @@
         "limits": "c",
         "ratio": "c",
         "*.inc": "cpp",
+=======
+        "*.inc": "c",
+>>>>>>> 0f5e24f... Changes
         "syscall.h": "c"
     }
 }

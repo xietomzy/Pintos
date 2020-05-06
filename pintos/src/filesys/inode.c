@@ -18,6 +18,10 @@
 void checkout(struct inode *inode);
 void flush_indirect_block(block_sector_t indirect_block_ptr);
 bool inode_resize(struct inode *inode, off_t size);
+void inode_close_dir_ptrs (struct inode *inode);
+void inode_close_indir_ptr (struct inode *inode);
+void close_indir_ptr (block_sector_t block);
+void inode_close_double_indir_ptr (struct inode *inode);
 
 
 /* List of open inodes, so that opening a single inode twice
@@ -173,9 +177,9 @@ byte_to_sector (const struct inode *inode, off_t pos)
       cache_read(fs_device, data->double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
       int ind_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE);
       block_sector_t (*ind_buffer)[128] = malloc(128 * sizeof(block_sector_t));
-      cache_read(fs_device, ind_buffer[ind_blk_index], ind_buffer, 0, BLOCK_SECTOR_SIZE);
+      cache_read(fs_device, *ind_buffer[ind_blk_index], ind_buffer, 0, BLOCK_SECTOR_SIZE);
       int blk_index = (pos - direct_bytes - indirect_bytes) / BLOCK_SECTOR_SIZE;
-      return_val = ind_buffer[blk_index];
+      return_val = *ind_buffer[blk_index];
       free(ind_buffer);
       free(buffer);
       goto cleanup;
@@ -216,7 +220,6 @@ bool inode_resize(struct inode *inode, off_t size) {
   ASSERT (sizeof(*inode_disk) == BLOCK_SECTOR_SIZE);
   cache_read(fs_device, inode->data, inode_disk, 0, BLOCK_SECTOR_SIZE);
 
-  block_sector_t sector;
   /* Perform iteration up to the number of direct sectors */
   for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
     if ((size <= BLOCK_SECTOR_SIZE * i) &&
@@ -291,7 +294,7 @@ bool inode_resize(struct inode *inode, off_t size) {
 
   for (int i = 0; i < 128; i ++) {
     if (size <= (NUM_DIRECT_SECTORS + 128 + i) * BLOCK_SECTOR_SIZE && buffer[i] != 0) {
-      // TODO: Release every block within the indirect block
+      // Release every block within the indirect block
       flush_indirect_block(buffer[i]);
       free_map_release(buffer[i], 1);
       buffer[i] = 0;
@@ -359,7 +362,6 @@ inode_create (block_sector_t sector, off_t length)
   node = calloc (1, sizeof *node);
   if (node != NULL)
     {
-      size_t sectors = bytes_to_sectors (length);
       node->magic = INODE_MAGIC;
       node->sector = sector;
       bool data_status = free_map_allocate(1, &(node->data));
@@ -367,8 +369,6 @@ inode_create (block_sector_t sector, off_t length)
       if (!data_status) {
         return false;
       }
-
-      block_sector_t run_start;
 
       if (inode_resize(node, length))
         {
@@ -603,9 +603,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
   access(inode, 1);
-  const uint8_t *buffer = buffer_;
+  const off_t *buffer = buffer_;
   off_t bytes_written = 0;
-  //uint8_t *bounce = NULL;
 
   if (inode->deny_write_cnt)
     return 0;

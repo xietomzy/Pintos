@@ -15,15 +15,21 @@ void test_main (void) {
     int second_number_of_hits;
 
     CHECK (create (file_name, BUF_SIZE), "create \"%s\"", file_name);
+
     CHECK ((fd = open (file_name)) > 1, "open \"%s\"", file_name);
-    for (int i = 0; i < sizeof buf; i++) 
-    {
+
+
+
+    for (int i = 0; i < sizeof buf; i++) {
         char c;
         // CHECK (read (fd, &c, 1) > 0, "read \"%s\"", file_name);
-        read (fd, &c, 1) > 0;
+        read (fd, &c, 1);
     }
+
+
     int num_old_hits = number_cache_hits();
     CHECK(true, "Number of cache hits: %i", num_old_hits);
+
 
     CHECK(number_cache_accesses() == 4096, "Number of bytes read: %i", number_cache_accesses());
 

@@ -3,6 +3,7 @@
         "*.inc": "c",
         "syscall.h": "c",
         "lib.h": "c",
-        "main.h": "c"
+        "main.h": "c",
+        "list.h": "c"
     }
 }

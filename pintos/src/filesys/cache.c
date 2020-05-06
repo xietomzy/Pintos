@@ -48,6 +48,8 @@ void cache_init (void) {
     }
     lock_init(&number_of_hits_lock);
     lock_init(&number_of_cache_accesses_lock);
+    number_of_hits = 0;
+    number_of_cache_accesses = 0;
 }
 
 /* Tries to get block in cache, returns NULL if not in cache
@@ -220,6 +222,7 @@ void cache_flush (void) {
     number_of_hits = 0;
     lock_release(&number_of_hits_lock);
 
+
     /* TODO: block_write all blocks in cache to disk */
     lock_acquire(&cache_lock);
     for (int i = 0; i < MAX_CACHE_BLOCKS; i++) {
@@ -229,6 +232,15 @@ void cache_flush (void) {
             lock_release(&(cache[i].cache_block_lock));
         }
     }
+
+    /* Empty the LRU list. */
+    while (!list_empty(&lru)) {
+        list_pop_front(&lru);
+    }
     memset(cache, 0, MAX_CACHE_BLOCKS * sizeof(struct cache_block));
+
+    for (int i = 0; i < MAX_CACHE_BLOCKS; i++) {
+        lock_init(&(cache[i].cache_block_lock));
+    }
     lock_release(&cache_lock);
 }

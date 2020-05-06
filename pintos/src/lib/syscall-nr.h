@@ -21,11 +21,12 @@ enum
     SYS_PRACTICE,               /* Returns arg incremented by 1 */
 
     /* Project 3 and optionally project 4. */
+    SYS_RESET_CACHE,            /* Flushes the cache. */
+    SYS_NUM_CACHE_HITS,          /* The number of cache hits before resetting the cache. */
+    SYS_NUM_CACHE_ACCESSES,      /* The number of cache accesses before resetting the cache. */
     SYS_MMAP,                   /* Map a file into memory. */
     SYS_MUNMAP,                 /* Remove a memory mapping. */
-    SYS_RESET_CACHE,            /* Flushes the cache. */
-    SYS_NUM_CACHE_ACCESSES,      /* The number of cache accesses before resetting the cache. */
-    SYS_NUM_CACHE_HITS,          /* The number of cache hits before resetting the cache. */
+
 
     /* Project 4 only. */
     SYS_CHDIR,                  /* Change the current directory. */

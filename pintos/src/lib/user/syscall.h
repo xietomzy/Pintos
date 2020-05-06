@@ -40,6 +40,7 @@ mapid_t mmap (int fd, void *addr);
 void munmap (mapid_t);
 
 // For the buffer cache tests
+void reset_cache (void);
 int number_cache_hits (void);
 int number_cache_accesses (void); 
 

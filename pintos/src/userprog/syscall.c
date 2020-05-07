@@ -6,6 +6,7 @@
 #include "userprog/pagedir.h"
 #include "devices/input.h"
 #include "devices/shutdown.h"
+#include "filesys/directory.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "filesys/cache.h"
@@ -30,6 +31,11 @@ static int sys_write (int handle, void *usrc_, unsigned size);
 static int sys_seek (int handle, unsigned position);
 static int sys_tell (int handle);
 static int sys_close (int handle);
+static bool sys_chdir (const char *dir);
+static bool sys_mkdir (const char *dir);
+static bool sys_readdir (int handle, const char *ufile);
+static bool sys_isdir (int handle);
+static int sys_inumber (int handle);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
@@ -77,6 +83,11 @@ syscall_handler (struct intr_frame *f)
       {1, (syscall_function *) sys_tell},
       {1, (syscall_function *) sys_close},
       {1, (syscall_function *) sys_practice},
+      {1, (syscall_function *) sys_chdir},
+      {1, (syscall_function *) sys_mkdir},
+      {2, (syscall_function *) sys_readdir},
+      {1, (syscall_function *) sys_isdir},
+      {1, (syscall_function *) sys_inumber},
       {0, (syscall_function *) sys_reset_cache},
       {0, (syscall_function *) sys_num_cache_hits},
       {0, (syscall_function *) sys_num_cache_accesses}
@@ -281,8 +292,10 @@ sys_remove (const char *ufile)
 struct file_descriptor
   {
     struct list_elem elem;      /* List element. */
-    struct file *file;          /* File. */
+    //struct file *file;          /* File. */
     int handle;                 /* File handle. */
+    void *ptr;            /* Directory or File */
+    bool f_or_d;                /* 0 if file, 1 if directory */
   };
  
 /* Open system call. */
@@ -297,8 +310,8 @@ sys_open (const char *ufile)
   if (fd != NULL)
     {
       //lock_acquire (&fs_lock);
-      fd->file = filesys_open (kfile);
-      if (fd->file != NULL)
+      fd->ptr = filesys_open (kfile, &(fd->f_or_d));
+      if (fd->ptr != NULL)
         {
           struct thread *cur = thread_current ();
           handle = fd->handle = cur->next_handle++;
@@ -342,7 +355,7 @@ sys_filesize (int handle)
   int size;
  
   //lock_acquire (&fs_lock);
-  size = file_length (fd->file);
+  size = file_length ((struct file *) fd->ptr);
   //lock_release (&fs_lock);
  
   return size;
@@ -383,7 +396,7 @@ sys_read (int handle, void *udst_, unsigned size)
         }
 
       /* Read from file into page. */
-      retval = file_read (fd->file, udst, read_amt);
+      retval = file_read ((struct file *) fd->ptr, udst, read_amt);
       if (retval < 0)
         {
           if (bytes_read == 0)
@@ -439,7 +452,7 @@ sys_write (int handle, void *usrc_, unsigned size)
           retval = write_amt;
         }
       else
-        retval = file_write (fd->file, usrc, write_amt);
+        retval = file_write ((struct file *) fd->ptr, usrc, write_amt);
       if (retval < 0) 
         {
           if (bytes_written == 0)
@@ -469,7 +482,7 @@ sys_seek (int handle, unsigned position)
    
   //lock_acquire (&fs_lock);
   if ((off_t) position >= 0)
-    file_seek (fd->file, position);
+    file_seek ((struct file *) fd->ptr, position);
   //lock_release (&fs_lock);
  
   return 0;
@@ -483,7 +496,7 @@ sys_tell (int handle)
   unsigned position;
    
   //lock_acquire (&fs_lock);
-  position = file_tell (fd->file);
+  position = file_tell ((struct file *) fd->ptr);
   //lock_release (&fs_lock);
  
   return position;
@@ -495,7 +508,11 @@ sys_close (int handle)
 {
   struct file_descriptor *fd = lookup_fd (handle);
   //lock_acquire (&fs_lock);
-  file_close (fd->file);
+  if (fd->f_or_d) {
+    dir_close((struct dir *) fd->ptr);
+  } else {
+    file_close ((struct file *) fd->ptr);
+  }
   //lock_release (&fs_lock);
   list_remove (&fd->elem);
   free (fd);
@@ -515,8 +532,48 @@ syscall_exit (void)
       fd = list_entry (e, struct file_descriptor, elem);
       next = list_next (e);
       //lock_acquire (&fs_lock);
-      file_close (fd->file);
+      if (fd->f_or_d) {
+        dir_close((struct dir *) fd->ptr);
+      } else {
+        file_close ((struct file *) fd->ptr);
+      }
       //lock_release (&fs_lock);
       free (fd);
     }
+}
+
+static bool sys_chdir (const char *dir) {
+  char *kfile = copy_in_string (dir);
+  bool result = filesys_chdir(kfile);
+  palloc_free_page(kfile);
+  return result;
+}
+
+static bool sys_mkdir (const char *dir) {
+  char *kfile = copy_in_string (dir);
+  bool result = filesys_mkdir(kfile);
+  palloc_free_page(kfile);
+  return result;
+}
+
+static bool sys_readdir (int handle, const char *name) {
+  struct file_descriptor *fd = lookup_fd (handle);
+  bool result = false;
+  if (fd->f_or_d) {
+    result = dir_readdir((struct dir *) fd->ptr, name);
+  }
+  return result;
+}
+
+static bool sys_isdir (int handle) {
+  struct file_descriptor *fd = lookup_fd (handle);
+  return fd->f_or_d;
+}
+
+static int sys_inumber (int handle) {
+  struct file_descriptor *fd = lookup_fd (handle);
+  if (fd->f_or_d) { // if directory
+    return inode_get_inumber(dir_get_inode((struct dir *) fd->ptr));
+  }
+  return inode_get_inumber(file_get_inode((struct file *) fd->ptr));
 }

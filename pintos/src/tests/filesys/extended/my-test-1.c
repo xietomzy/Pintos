@@ -2,6 +2,7 @@
 #include "tests/filesys/extended/mk-tree.h"
 #include "tests/lib.h"
 #include "tests/filesys/extended/syn-rw.h"
+#include <stdio.h>
 
 static char buf[BUF_SIZE];
 
@@ -9,10 +10,19 @@ static char buf[BUF_SIZE];
 void test_main (void) {
     /* Some variables: fd, number of accesses and hits. */
     int fd;
+    int initial_number_of_hits;
+    int initial_number_of_accesses;
     int first_number_of_accesses;
     int second_number_of_accesses;
     int first_number_of_hits;
     int second_number_of_hits;
+
+    /* Reset the cache, and check to see if number of hits and accesses are 0. */
+    reset_cache();
+    initial_number_of_accesses = number_cache_accesses();
+    initial_number_of_hits = number_cache_hits();
+    msg("Number of initial cache accesses: %i", initial_number_of_accesses);
+    msg("Number of initial cache hits: %i", initial_number_of_hits);
 
     /* Create and open the file */
     CHECK (create (file_name, BUF_SIZE), "create \"%s\"", file_name);
@@ -26,8 +36,9 @@ void test_main (void) {
 
     /* Calculate the number of cache hits. */
     first_number_of_hits = number_cache_hits();
-    msg("Number of initial cache accesses: %i", number_cache_accesses());
-    msg("Number of initial cache hits: %i", first_number_of_hits);
+    first_number_of_accesses = number_cache_accesses(); 
+    msg("Number of first cache accesses: %i", first_number_of_accesses);
+    msg("Number of first cache hits: %i", first_number_of_hits);
 
     /* Close and reopen the file. */
     close(fd);
@@ -41,7 +52,7 @@ void test_main (void) {
 
     /* Find the number of cache hits this time. */
     second_number_of_hits = number_cache_hits() - first_number_of_hits;
-    msg("Number of total cache accesses: %i", number_cache_accesses());
+    second_number_of_accesses = number_cache_accesses() - first_number_of_accesses;
+    msg("Number of total cache accesses: %i", second_number_of_accesses);
     msg("Number of second set of cache hits: %i", second_number_of_hits);
-
 }

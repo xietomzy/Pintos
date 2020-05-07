@@ -32,6 +32,7 @@ struct exec_info
     struct semaphore load_done;         /* "Up"ed when loading complete. */
     struct wait_status *wait_status;    /* Child process. */
     bool success;                       /* Program successfully loaded? */
+    struct dir *dir;
   };
 
 /* Starts a new thread running a user program loaded from
@@ -48,6 +49,7 @@ process_execute (const char *file_name)
 
   /* Initialize exec_info. */
   exec.file_name = file_name;
+  exec.dir = thread_current ()->cwd;
   sema_init (&exec.load_done, 0);
 
   /* Create a new thread to execute FILE_NAME. */
@@ -100,6 +102,13 @@ start_process (void *exec_)
       sema_init (&exec->wait_status->dead, 0);
     }
   
+  /* Set current working directory; root if cwd == NULL, else inherit from parent */
+  if (exec->dir == NULL) {
+    thread_current()->cwd = dir_open_root();
+  } else {
+    thread_current ()->cwd = dir_reopen(exec->dir);
+  }
+
   /* Notify parent thread and clean up. */
   exec->success = success;
   sema_up (&exec->load_done);
@@ -323,7 +332,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     *cp = '\0';
 
   /* Open executable file. */
-  t->bin_file = file = filesys_open (file_name);
+  bool *dummy;
+  t->bin_file = file = filesys_open (file_name, dummy);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);

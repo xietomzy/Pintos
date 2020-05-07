@@ -6,9 +6,39 @@ struct list lru;
 struct lock cache_lock;
 struct cache_block cache[MAX_CACHE_BLOCKS];
 
+/* These will get reset when we flush the cache. */
+static int number_of_hits;
+static int number_of_cache_accesses;
+
+/* Locks for the number of hits and number of cache accesses. */
+struct lock number_of_hits_lock;
+struct lock number_of_cache_accesses_lock;
+
 struct cache_block *cache_get_block(block_sector_t sector); 
 void lru_move_front(struct cache_block *block);
 void new_block(struct block *device, struct cache_block *block, block_sector_t sector, void *buffer, bool r_or_w, off_t offset, int chunk_size);
+
+int num_cache_hits(void) {
+    return number_of_hits;
+}
+int num_cache_accesses(void) {
+    return number_of_cache_accesses;
+}
+
+/* Incrememebt number_of_hits by one. */
+void increment_number_hits (void) {
+    lock_acquire(&number_of_hits_lock);
+    number_of_hits ++;
+    lock_release(&number_of_hits_lock);
+}
+
+/* Increment number of cache accesses. */
+void increment_number_cache_accesses (void) {
+    lock_acquire(&number_of_cache_accesses_lock);
+    number_of_cache_accesses ++;
+    lock_release(&number_of_cache_accesses_lock);
+}
+
 /* Initialize the cache. */
 void cache_init (void) {
     list_init(&lru);
@@ -16,7 +46,10 @@ void cache_init (void) {
     for (int i = 0; i < MAX_CACHE_BLOCKS; i++) {
         lock_init(&(cache[i].cache_block_lock));
     }
+    lock_init(&number_of_hits_lock);
+    lock_init(&number_of_cache_accesses_lock);
 }
+
 /* Tries to get block in cache, returns NULL if not in cache
     Global lock must be held before calling this function
  */
@@ -60,6 +93,8 @@ void new_block(struct block *device, struct cache_block *block, block_sector_t s
 
 void cache_read (struct block *block, block_sector_t sector, void *buffer, off_t offset, int chunk_size) {
 
+    increment_number_cache_accesses();
+
     /* We must acquire a lock to start reading the cache. */
     lock_acquire(&cache_lock);
     /* Check if block is in cache */
@@ -76,6 +111,9 @@ void cache_read (struct block *block, block_sector_t sector, void *buffer, off_t
                 goto cache_miss;
             }
         }
+
+        increment_number_hits();
+
         /* Read into buffer */
         memcpy(buffer, cache_blk->data + offset, chunk_size);
         lock_release(&(cache_blk->cache_block_lock));
@@ -114,6 +152,8 @@ void cache_read (struct block *block, block_sector_t sector, void *buffer, off_t
 }
 
 void cache_write (struct block *block, block_sector_t sector, void *buffer, off_t offset, int chunk_size) {
+
+    increment_number_cache_accesses();
     
     /* We must acquire a lock to start reading the cache. */
     lock_acquire(&cache_lock);
@@ -131,6 +171,9 @@ void cache_write (struct block *block, block_sector_t sector, void *buffer, off_
                 goto cache_miss;
             }
         }
+
+        increment_number_hits();
+
         memcpy(cache_blk->data + offset, buffer, chunk_size);
         cache_blk->dirty = true;
         lock_release(&(cache_blk->cache_block_lock));
@@ -169,6 +212,14 @@ void cache_write (struct block *block, block_sector_t sector, void *buffer, off_
 }
 
 void cache_flush (void) {
+    lock_acquire(&number_of_cache_accesses_lock);
+    number_of_cache_accesses = 0;
+    lock_release(&number_of_cache_accesses_lock);
+
+    lock_acquire(&number_of_hits_lock);
+    number_of_hits = 0;
+    lock_release(&number_of_hits_lock);
+
     /* TODO: block_write all blocks in cache to disk */
     lock_acquire(&cache_lock);
     for (int i = 0; i < MAX_CACHE_BLOCKS; i++) {

@@ -22,7 +22,7 @@ void test_main (void) {
     initial_number_of_accesses = number_cache_accesses();
     initial_number_of_hits = number_cache_hits();
     msg("Number of initial cache accesses: %i", initial_number_of_accesses);
-    msg("Number of initial cache hits: %i", initial_number_of_hits);
+    msg("Number of initial cache hits: %i", initial_number_of_hits);        
 
     /* Create and open the file */
     CHECK (create (file_name, BUF_SIZE), "create \"%s\"", file_name);

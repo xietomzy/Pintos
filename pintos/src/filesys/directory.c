@@ -21,6 +21,8 @@ struct dir_entry
     bool in_use;                        /* In use or free? */
   };
 
+
+
 /* Creates a directory with space for ENTRY_CNT entries in the
    given SECTOR.  Returns true if successful, false on failure. */
 bool

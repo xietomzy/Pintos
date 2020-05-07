@@ -48,6 +48,7 @@ void test_main (void) {
         read (fd, &d, 1);
     }
 
-    /* Calculate the ratio of cache accesses to the number of times we read from the device. */
-    CHECK(is_close_to_one_twenty_eight(num_dev_writes), "The number of device reads should be near 128");
+    /* The number of device reads should be roughly 128 */
+    long long num_dev_reads = number_device_reads() - i_read_cnt;
+    CHECK(is_close_to_one_twenty_eight(num_dev_reads), "The number of device reads should be near 128");
 }

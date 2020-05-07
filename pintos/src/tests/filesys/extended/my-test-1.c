@@ -4,6 +4,7 @@
 #include "tests/filesys/extended/syn-rw.h"
 #include <stdio.h>
 
+
 static char buf[BUF_SIZE];
 
 
@@ -37,8 +38,8 @@ void test_main (void) {
     /* Calculate the number of cache hits. */
     first_number_of_hits = number_cache_hits();
     first_number_of_accesses = number_cache_accesses(); 
-    msg("Number of first cache accesses: %i", first_number_of_accesses);
-    msg("Number of first cache hits: %i", first_number_of_hits);
+    msg("Number of first set of cache accesses: %i", first_number_of_accesses);
+    msg("Number of first set of cache hits: %i", first_number_of_hits);
 
     /* Close and reopen the file. */
     close(fd);
@@ -53,6 +54,6 @@ void test_main (void) {
     /* Find the number of cache hits this time. */
     second_number_of_hits = number_cache_hits() - first_number_of_hits;
     second_number_of_accesses = number_cache_accesses() - first_number_of_accesses;
-    msg("Number of total cache accesses: %i", second_number_of_accesses);
+    msg("Number of second set of cache accesses: %i", second_number_of_accesses);
     msg("Number of second set of cache hits: %i", second_number_of_hits);
 }

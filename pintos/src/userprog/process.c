@@ -77,6 +77,13 @@ start_process (void *exec_)
   struct intr_frame if_;
   bool success;
 
+  /* Set current working directory; root if cwd == NULL, else inherit from parent */
+  if (exec->dir == NULL) {
+    thread_current()->cwd = dir_open_root();
+  } else {
+    thread_current()->cwd = dir_reopen(exec->dir);
+  }
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -102,13 +109,6 @@ start_process (void *exec_)
       sema_init (&exec->wait_status->dead, 0);
     }
   
-  /* Set current working directory; root if cwd == NULL, else inherit from parent */
-  if (exec->dir == NULL) {
-    thread_current()->cwd = dir_open_root();
-  } else {
-    thread_current ()->cwd = dir_reopen(exec->dir);
-  }
-
   /* Notify parent thread and clean up. */
   exec->success = success;
   sema_up (&exec->load_done);
@@ -332,8 +332,8 @@ load (const char *cmd_line, void (**eip) (void), void **esp)
     *cp = '\0';
 
   /* Open executable file. */
-  bool *dummy;
-  t->bin_file = file = filesys_open (file_name, dummy);
+  bool dummy;
+  t->bin_file = file = filesys_open (file_name, &dummy);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);

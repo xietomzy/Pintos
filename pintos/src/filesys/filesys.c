@@ -92,24 +92,6 @@ filesys_create (const char *name, off_t initial_size)
   return success;
 }
 
-/* Opens the file with the given NAME.
-   Returns the new file if successful or a null pointer
-   otherwise.
-   Fails if no file named NAME exists,
-   or if an internal memory allocation fails. */
-// struct file *
-// filesys_open (const char *name)
-// {
-//   struct dir *dir = dir_open_root ();
-//   struct inode *inode = NULL;
-
-//   if (dir != NULL)
-//     dir_lookup (dir, name, &inode);
-//   dir_close (dir);
-
-//   return file_open (inode);
-// }
-
 /* 0 for relative, 1 for absolute*/
 bool rel_or_abs(const char *name) {
   if (*name == '/') { // if absolute
@@ -129,14 +111,16 @@ void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d
   struct file *file;
   char **srcp = &name; // name pointer for get_next_part
   while (get_next_part(name_buffer, srcp) == 1) {
-    success = dir_lookup(dir, name_buffer, inode); // check if directory/file exists in dir
+    success = dir_lookup(dir, name_buffer, &inode); // check if directory/file exists in dir
     if (!success) { // if dir/file doesn't exist, return NULL
       return NULL;
     }
 
     file = file_open(inode); // try to open file
     if (file != NULL) { // if path has file, immediately return the file
-      thread_current()->cwd = dir; // set cwd
+      if (thread_current()->cwd != NULL) {
+        thread_current()->cwd = dir; // set cwd
+      }
       dir_close(dir);
       *f_or_d = 0;
       return (void *) file;
@@ -145,7 +129,9 @@ void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d
     dir = dir_open(inode); // try to open directory
     if (dir != NULL) { // if we get a directory, continue looking into the directory
       if (**srcp == '\0') { // if last thing in path is a directory, we return a directory
-        thread_current()->cwd = dir; // set cwd
+        if (thread_current()->cwd != NULL) {
+          thread_current()->cwd = dir; // set cwd
+        }
         *f_or_d = 1;
         return (void *) dir;
       }
@@ -155,21 +141,20 @@ void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d
   return NULL;
 }
 
+/* Opens the file with the given NAME.
+   Returns the new file if successful or a null pointer
+   otherwise.
+   Fails if no file named NAME exists,
+   or if an internal memory allocation fails. */
 void *
 filesys_open (const char *name, bool *f_or_d)
 {
   //struct dir *dir = dir_open_root ();
   /* if given absolute path */
-  if (rel_or_abs(name)) {
+  if (rel_or_abs(name) || thread_current()->cwd == NULL) {
     return filesys_open_helper(dir_open_root(), name, f_or_d);
   } else { // if given relative path
-    // if (*name == '.' && *(name++) == '.') { // parent directory case
-    //   return filesys_open_helper(dir_reopen(...), name + 2, f_or_d) /* TODO: put parent directory as parameter */
-    // } else if (*name == '.') { // current directory case
-    //   return filesys_open_helper(dir_reopen(thread_current()->cwd), name + 1, f_or_d);
-    // } else {
     return filesys_open_helper(dir_reopen(thread_current()->cwd), name, f_or_d);
-    // }
   }
   return NULL;
 }
@@ -184,7 +169,6 @@ filesys_remove (const char *name)
   struct dir *dir = dir_open_root ();
   bool success = dir != NULL && dir_remove (dir, name);
   dir_close (dir); 
-
   return success;
 }
 
@@ -201,18 +185,12 @@ do_format (void)
 }
 
 bool filesys_chdir(const char *name) {
-  bool *dummy;
+  bool dummy;
   struct dir *result;
   if (rel_or_abs(name)) { // if absolute
-    result = (struct dir *) filesys_open_helper(dir_open_root(), name, dummy);
+    result = (struct dir *) filesys_open_helper(dir_open_root(), name, &dummy);
   } else { // if relative
-    // if (*name == '.' && *(name++) == '.') { // parent directory case
-    //   result = filesys_open_helper(dir_reopen(...), name + 2, dummy) /* TODO: put parent directory as parameter */
-    // } else if (*name == '.') { // current directory case
-    //   result = filesys_open_helper(dir_reopen(thread_current()->cwd), name + 1, dummy);
-    // } else {
-    result = (struct dir *) filesys_open_helper(dir_reopen(thread_current()->cwd), name, dummy);
-    // }
+    result = (struct dir *) filesys_open_helper(dir_reopen(thread_current()->cwd), name, &dummy);
   }
 
   if (result != NULL) {
@@ -232,7 +210,7 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name) {
   char **srcp = &name; // name pointer for get_next_part
   struct dir *prev_dir;
   while (get_next_part(name_buffer, srcp) == 1) {
-    dir_lookup(dir, name_buffer, inode); // check if directory/file exists in dir
+    dir_lookup(dir, name_buffer, &inode); // check if directory/file exists in dir
     dir_close(dir);
     prev_dir = dir;
     dir = dir_open(inode); // try to open directory
@@ -263,15 +241,8 @@ bool filesys_mkdir(const char *name) {
   if (rel_or_abs(name)) {
     result = filesys_mkdir_helper(dir_open_root(), name);
   } else {
-    // if (*name == '.' && *(name++) == '.') { // parent directory case
-    //   result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd));
-    // } else if (*name == '.') { // current directory case
-    //   result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd));
-    // } else {
     result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name);
-    //}
   }
 
   return result;
 }
-

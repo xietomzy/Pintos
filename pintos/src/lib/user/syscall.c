@@ -204,3 +204,11 @@ number_cache_hits()
 int number_cache_accesses() {
   return syscall0(SYS_NUM_CACHE_ACCESSES);
 }
+
+long long number_device_reads() {
+  return syscall0(SYS_NUM_DEVICE_READS);
+}
+
+long long number_device_writes() {
+  return syscall0(SYS_NUM_DEVICE_WRITES);
+}

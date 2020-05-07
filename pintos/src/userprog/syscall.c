@@ -42,6 +42,8 @@ static void copy_in (void *, const void *, size_t);
 static void sys_reset_cache (void);
 static int sys_num_cache_hits (void);
 static int sys_num_cache_accesses (void);
+static long long sys_num_device_reads (void);
+static long long sys_num_device_writes (void);
  
 /* Serializes file system operations. */
 //static struct lock fs_lock;
@@ -91,6 +93,8 @@ syscall_handler (struct intr_frame *f)
       {2, (syscall_function *) sys_readdir},
       {1, (syscall_function *) sys_isdir},
       {1, (syscall_function *) sys_inumber},
+      {0, (syscall_function *) sys_num_device_reads},
+      {0, (syscall_function *) sys_num_device_writes}
     };
 
   const struct syscall *sc;
@@ -189,6 +193,19 @@ copy_in_string (const char *us)
   ks[PGSIZE - 1] = '\0';
   return ks;
 }
+
+/* Counts the number of file system device reads. */
+static long long sys_num_device_reads (void) 
+{
+  return fs_num_reads();
+}
+
+/* Counts the number of file system device writes. */
+static long long sys_num_device_writes (void) 
+{
+  return fs_num_writes();
+}
+
 
 /* Counts the number of cache hits before sys_reset_cache. */
 static int

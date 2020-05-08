@@ -492,15 +492,16 @@ inode_get_inumber (const struct inode *inode)
 /* Closes all of the direct pointers. */
 void
 inode_close_dir_ptrs (struct inode *inode) {
-  struct inode_disk inode_disk;
-  cache_read(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < NUM_DIRECT_SECTORS; i ++) {
-    if (inode_disk.direct_sector_ptrs[i] != 0) {
-      free_map_release(inode_disk.direct_sector_ptrs[i], 1);
-      inode_disk.direct_sector_ptrs[i] = 0;
+    block_sector_t dir_ptr;
+    off_t offset = sizeof(off_t) + i * sizeof(block_sector_t);
+    cache_read(fs_device, inode->data, &dir_ptr, offset, sizeof(dir_ptr));
+    if (dir_ptr != 0) {
+      free_map_release(dir_ptr, 1);
+      dir_ptr = 0;
+      cache_write(fs_device, inode->data, &dir_ptr, offset, sizeof(dir_ptr));
     }
   }
-  cache_write(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
 }
 
 /* Closes the indirect pointer, and sets the inode's indirect_block pointer to 0. */

@@ -92,7 +92,6 @@ filesys_create (const char *name, off_t initial_size)
   // }
   // dir_close (dir);
   // return success;
-  bool result;
   if (rel_or_abs(name) || thread_current()->cwd == NULL) {
     return filesys_mkdir_helper(dir_open_root(), name, true, initial_size, false);
   } else {
@@ -117,7 +116,7 @@ void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d
   struct inode *inode = NULL;
   bool success;
   struct file *file = NULL;
-  char **srcp = &name; // name pointer for get_next_part
+  const char **srcp = &name; // name pointer for get_next_part
   while (get_next_part(name_buffer, srcp) == 1) {
     success = dir_lookup(dir, name_buffer, &inode); // check if directory/file exists in dir
     if (!success) { // if dir/file doesn't exist, return NULL
@@ -218,7 +217,7 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file,
   char name_buffer[NAME_MAX + 1];
   struct inode *inode = NULL;
   //bool success;
-  char **srcp = &name; // name pointer for get_next_part
+  const char **srcp = &name; // name pointer for get_next_part
   struct dir *prev_dir;
   //struct file *file;
   while (get_next_part(name_buffer, srcp) == 1) {

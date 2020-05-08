@@ -3,6 +3,8 @@
 #include "tests/lib.h"
 #include "tests/filesys/extended/syn-rw.h"
 #include <stdio.h>
+bool is_close_to_one_twenty_eight(long long number);
+void test_main (void);
 
 /* Returns true if NUMBER is within a difference of 20 from 128 */
 bool is_close_to_one_twenty_eight(long long number) {

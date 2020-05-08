@@ -23,6 +23,7 @@ off_t inode_length (const struct inode *);
 /* More helper funtions */
 bool
 inode_expand (struct inode *, size_t start, size_t sectors);
+bool inode_is_dir(struct inode *);
 
 void
 access (struct inode *, int type);

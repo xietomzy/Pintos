@@ -18,6 +18,9 @@ struct cache_block *cache_get_block(block_sector_t sector);
 void lru_move_front(struct cache_block *block);
 void new_block_read(struct block *device, struct cache_block *block, block_sector_t sector, void *buffer, off_t offset, size_t chunk_size);
 void new_block_write(struct block *device, struct cache_block *block, block_sector_t sector, const void *buffer, off_t offset, size_t chunk_size);
+void increment_number_hits (void);
+void increment_number_cache_accesses (void);
+
 
 int num_cache_hits(void) {
     return number_of_hits;

@@ -4,6 +4,7 @@
 #include "tests/filesys/extended/syn-rw.h"
 #include <stdio.h>
 
+void test_main(void);
 
 static char buf[BUF_SIZE];
 
@@ -30,7 +31,7 @@ void test_main (void) {
     CHECK ((fd = open (file_name)) > 1, "open \"%s\"", file_name);
 
     /* Perform a bunch of reads. */
-    for (int i = 0; i < sizeof buf; i++) {
+    for (size_t i = 0; i < sizeof buf; i++) {
         char c;
         read (fd, &c, 1);
     }
@@ -46,7 +47,7 @@ void test_main (void) {
     CHECK ((fd = open (file_name)) > 1, "open \"%s\"", file_name);
 
     /* Perform a bunch of reads again. */
-    for (int i = 0; i < sizeof buf; i++) {
+    for (size_t i = 0; i < sizeof buf; i++) {
         char c;
         read (fd, &c, 1);
     }    

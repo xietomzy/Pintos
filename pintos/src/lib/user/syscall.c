@@ -192,7 +192,7 @@ inumber (int fd)
 void 
 reset_cache () 
 {
-  return syscall0(SYS_RESET_CACHE);
+  syscall0(SYS_RESET_CACHE);
 }
 
 int 

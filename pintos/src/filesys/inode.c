@@ -694,8 +694,11 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 void
 inode_deny_write (struct inode *inode)
 {
+  // TODO: Sleep until all writers finish if there are any
+  lock_acquire(&(inode->metadata));
   inode->deny_write_cnt++;
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
+  lock_release(&(inode->metadata));
 }
 
 /* Re-enables writes to INODE.
@@ -704,9 +707,11 @@ inode_deny_write (struct inode *inode)
 void
 inode_allow_write (struct inode *inode)
 {
+  lock_acquire(&(inode->metadata));
   ASSERT (inode->deny_write_cnt > 0);
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
   inode->deny_write_cnt--;
+  lock_release(&(inode->metadata));
 }
 
 /* Returns the length, in bytes, of INODE's data. */

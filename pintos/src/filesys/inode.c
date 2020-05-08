@@ -210,14 +210,14 @@ byte_to_sector (const struct inode *inode, off_t pos)
  * is an indirect block pointer that is already populated with block sectors.
  * It basically release all of the indirect blocks. Does not release indirect_block_ptr! */
 void flush_indirect_block(block_sector_t indirect_block_ptr) {
-  // This is an indirect_block pointer
-  block_sector_t buffer[128];
-  memset(buffer, 0, BLOCK_SECTOR_SIZE);
-  cache_read(fs_device, indirect_block_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   for (int i = 0; i < 128; i ++) {
-    if (buffer[i] != 0) {
-      free_map_release(buffer[i], 1);
-      buffer[i] = 0;
+    off_t byte_off = i * sizeof(block_sector_t);
+    block_sector_t ptr;
+    cache_read(fs_device, indirect_block_ptr, &ptr, byte_off, sizeof(ptr));
+    if (ptr != 0) {
+      free_map_release(ptr, 1);
+      ptr = 0;
+      cache_write(fs_device, indirect_block_ptr, &ptr, byte_off, sizeof(ptr));
     }
   }
 }

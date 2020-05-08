@@ -56,6 +56,10 @@ void block_write (struct block *, block_sector_t, const void *);
 const char *block_name (struct block *);
 enum block_type block_type (struct block *);
 
+/* File system. */
+long long fs_num_reads (void); 
+long long fs_num_writes (void);
+
 /* Statistics. */
 void block_print_stats (void);
 

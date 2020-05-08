@@ -43,6 +43,8 @@ void munmap (mapid_t);
 void reset_cache (void);
 int number_cache_hits (void);
 int number_cache_accesses (void); 
+long long number_device_reads (void);
+long long number_device_writes (void);
 
 
 /* Project 4 only. */

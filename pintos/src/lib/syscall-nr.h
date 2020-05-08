@@ -29,8 +29,10 @@ enum
 
     /* Project 3 and optionally project 4. */
     SYS_RESET_CACHE,            /* Flushes the cache. */
-    SYS_NUM_CACHE_HITS,          /* The number of cache hits before resetting the cache. */
-    SYS_NUM_CACHE_ACCESSES,      /* The number of cache accesses before resetting the cache. */
+    SYS_NUM_CACHE_HITS,         /* The number of cache hits before resetting the cache. */
+    SYS_NUM_CACHE_ACCESSES,     /* The number of cache accesses before resetting the cache. */
+    SYS_NUM_DEVICE_READS,       /* The number of file system device reads. */
+    SYS_NUM_DEVICE_WRITES,      /* The number of file system device writes. */
     SYS_MMAP,                   /* Map a file into memory. */
     SYS_MUNMAP                 /* Remove a memory mapping. */
 

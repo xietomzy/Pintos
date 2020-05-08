@@ -203,6 +203,13 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+  if (inode_is_dir(inode)) {
+    struct dir_entry e;
+    if (inode_read_at (dir->inode, &e, sizeof e, dir->pos + sizeof(e) * 2) == sizeof e) { // directory not empty
+      return false;
+    }
+  }
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 

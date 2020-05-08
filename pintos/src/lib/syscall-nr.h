@@ -20,6 +20,13 @@ enum
     SYS_CLOSE,                  /* Close a file. */
     SYS_PRACTICE,               /* Returns arg incremented by 1 */
 
+    /* Project 4 only. */
+    SYS_CHDIR,                  /* Change the current directory. */
+    SYS_MKDIR,                  /* Create a directory. */
+    SYS_READDIR,                /* Reads a directory entry. */
+    SYS_ISDIR,                  /* Tests if a fd represents a directory. */
+    SYS_INUMBER,                 /* Returns the inode number for a fd. */
+
     /* Project 3 and optionally project 4. */
     SYS_RESET_CACHE,            /* Flushes the cache. */
     SYS_NUM_CACHE_HITS,         /* The number of cache hits before resetting the cache. */
@@ -27,15 +34,10 @@ enum
     SYS_NUM_DEVICE_READS,       /* The number of file system device reads. */
     SYS_NUM_DEVICE_WRITES,      /* The number of file system device writes. */
     SYS_MMAP,                   /* Map a file into memory. */
-    SYS_MUNMAP,                 /* Remove a memory mapping. */
+    SYS_MUNMAP                 /* Remove a memory mapping. */
 
 
-    /* Project 4 only. */
-    SYS_CHDIR,                  /* Change the current directory. */
-    SYS_MKDIR,                  /* Create a directory. */
-    SYS_READDIR,                /* Reads a directory entry. */
-    SYS_ISDIR,                  /* Tests if a fd represents a directory. */
-    SYS_INUMBER                 /* Returns the inode number for a fd. */
+    
   };
 
 #endif /* lib/syscall-nr.h */

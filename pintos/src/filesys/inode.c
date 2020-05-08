@@ -368,6 +368,7 @@ inode_create (block_sector_t sector, off_t length, bool is_dir)
       node->magic = INODE_MAGIC;
       node->sector = sector;
       node->is_dir = is_dir;
+      lock_init(&(node->dir_lock));
       bool data_status = free_map_allocate(1, &(node->data));
   
       if (!data_status) {
@@ -569,6 +570,11 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   off_t bytes_read = 0;
   //uint8_t *bounce = NULL;
 
+  /* Acquire directory lock. */
+  if (inode_is_dir(inode)) {
+    lock_acquire(&(inode->dir_lock));
+  }
+
   while (size > 0)
     {
       /* Disk sector to read, starting byte offset within sector. */
@@ -595,6 +601,9 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
     }
   
   checkout(inode);
+  if (inode_is_dir(inode)) {
+    lock_release(&(inode->dir_lock));
+  }
   return bytes_read;
 }
 
@@ -612,7 +621,15 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   off_t bytes_written = 0;
   //uint8_t *bounce = NULL;
 
+  /* Acquire the lock. */
+  if (inode_is_dir(inode)) {
+    lock_acquire(&(inode->dir_lock));
+  }
+
   if (inode->deny_write_cnt)
+    if (inode_is_dir(inode)) {
+      lock_release(&(inode->dir_lock));
+    }
     return 0;
 
   while (size > 0)
@@ -641,6 +658,9 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
   //free (bounce);
 
   checkout(inode);
+  if (inode_is_dir(inode)) {
+    lock_release(&(inode->dir_lock));
+  }
   return bytes_written;
 }
 
@@ -668,10 +688,16 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
+  if (inode_is_dir(inode)) {
+    lock_acquire(&(inode->dir_lock));
+  }
   struct inode_disk *disk = malloc(BLOCK_SECTOR_SIZE);
   cache_read(fs_device, inode->data, disk, 0, BLOCK_SECTOR_SIZE);
   off_t length = disk->length;
   free(disk);
+  if (inode_is_dir(inode)) {
+    lock_release(&(inode->dir_lock));
+  }
   return length;
 }
 

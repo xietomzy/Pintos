@@ -447,8 +447,10 @@ inode_open (block_sector_t sector)
 
   /* Allocate memory. */
   inode = malloc (sizeof *inode);
-  if (inode == NULL)
+  if (inode == NULL) {
+    lock_release(&open_inodes_lock);
     return NULL;
+  }
 
   cache_read (fs_device, sector, inode, 0, BLOCK_SECTOR_SIZE);
 

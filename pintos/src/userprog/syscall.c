@@ -8,6 +8,7 @@
 #include "devices/shutdown.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/cache.h"
 #include "threads/interrupt.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
@@ -32,6 +33,11 @@ static int sys_close (int handle);
  
 static void syscall_handler (struct intr_frame *);
 static void copy_in (void *, const void *, size_t);
+static void sys_reset_cache (void);
+static int sys_num_cache_hits (void);
+static int sys_num_cache_accesses (void);
+static long long sys_num_device_reads (void);
+static long long sys_num_device_writes (void);
  
 /* Serializes file system operations. */
 //static struct lock fs_lock;
@@ -73,6 +79,11 @@ syscall_handler (struct intr_frame *f)
       {1, (syscall_function *) sys_tell},
       {1, (syscall_function *) sys_close},
       {1, (syscall_function *) sys_practice},
+      {0, (syscall_function *) sys_reset_cache},
+      {0, (syscall_function *) sys_num_cache_hits},
+      {0, (syscall_function *) sys_num_cache_accesses},
+      {0, (syscall_function *) sys_num_device_reads},
+      {0, (syscall_function *) sys_num_device_writes}
     };
 
   const struct syscall *sc;
@@ -170,6 +181,39 @@ copy_in_string (const char *us)
     }
   ks[PGSIZE - 1] = '\0';
   return ks;
+}
+
+/* Counts the number of file system device reads. */
+static long long sys_num_device_reads (void) 
+{
+  return fs_num_reads();
+}
+
+/* Counts the number of file system device writes. */
+static long long sys_num_device_writes (void) 
+{
+  return fs_num_writes();
+}
+
+
+/* Counts the number of cache hits before sys_reset_cache. */
+static int
+sys_num_cache_hits (void) 
+{
+  return num_cache_hits();
+}
+
+/* Counts the number of cache accesses before sys_reset_cache. */
+static int 
+sys_num_cache_accesses (void) {
+  return num_cache_accesses();
+}
+
+/* Reset the cache system call. */
+static void 
+sys_reset_cache (void) 
+{
+  cache_flush();
 }
  
 /* Practice system call. */

@@ -188,3 +188,27 @@ inumber (int fd)
 {
   return syscall1 (SYS_INUMBER, fd);
 }
+
+void 
+reset_cache () 
+{
+  return syscall0(SYS_RESET_CACHE);
+}
+
+int 
+number_cache_hits()
+{
+  return syscall0(SYS_NUM_CACHE_HITS);
+}
+
+int number_cache_accesses() {
+  return syscall0(SYS_NUM_CACHE_ACCESSES);
+}
+
+long long number_device_reads() {
+  return syscall0(SYS_NUM_DEVICE_READS);
+}
+
+long long number_device_writes() {
+  return syscall0(SYS_NUM_DEVICE_WRITES);
+}

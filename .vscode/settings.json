@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.inc": "c",
+        "syscall.h": "c",
+        "lib.h": "c",
+        "main.h": "c",
+        "list.h": "c",
+        "syn-rw.h": "c"
+    }
+}

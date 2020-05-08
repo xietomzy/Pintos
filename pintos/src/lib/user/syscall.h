@@ -39,6 +39,14 @@ int practice (int i);
 mapid_t mmap (int fd, void *addr);
 void munmap (mapid_t);
 
+// For the buffer cache tests
+void reset_cache (void);
+int number_cache_hits (void);
+int number_cache_accesses (void); 
+long long number_device_reads (void);
+long long number_device_writes (void);
+
+
 /* Project 4 only. */
 bool chdir (const char *dir);
 bool mkdir (const char *dir);

@@ -234,6 +234,14 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
  * resize the inode and when the current thread acquired the resize lock.
  * Also frees the lock acquired by the initial inode. */
 bool inode_resize(struct inode *inode, off_t size) {
+  ASSERT (lock_held_by_current_thread(&(inode->resize)));
+  ASSERT (inode->curType == 1);
+
+  // Check if another thread already resized before we could start resizing
+  if (inode_length (inode) >= size) {
+    return true;
+  }
+
   off_t cur_len;
   cache_read(fs_device, inode->data, &cur_len, 0, sizeof(cur_len));
 
@@ -662,6 +670,16 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
+
+  // Check for resize
+  if (offset + size > inode_length (inode)) {
+    lock_acquire (&(inode->resize));
+    bool success = inode_resize (inode, offset + size);
+    lock_release (&(inode->resize));
+    if (!success) {
+      return 0;
+    }
+  }
 
   while (size > 0)
     {

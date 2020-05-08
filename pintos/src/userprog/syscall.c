@@ -85,14 +85,14 @@ syscall_handler (struct intr_frame *f)
       {1, (syscall_function *) sys_tell},
       {1, (syscall_function *) sys_close},
       {1, (syscall_function *) sys_practice},
-      {0, (syscall_function *) sys_reset_cache},
-      {0, (syscall_function *) sys_num_cache_hits},
-      {0, (syscall_function *) sys_num_cache_accesses},
       {1, (syscall_function *) sys_chdir},
       {1, (syscall_function *) sys_mkdir},
       {2, (syscall_function *) sys_readdir},
       {1, (syscall_function *) sys_isdir},
       {1, (syscall_function *) sys_inumber},
+      {0, (syscall_function *) sys_reset_cache},
+      {0, (syscall_function *) sys_num_cache_hits},
+      {0, (syscall_function *) sys_num_cache_accesses},
       {0, (syscall_function *) sys_num_device_reads},
       {0, (syscall_function *) sys_num_device_writes}
     };

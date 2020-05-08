@@ -227,15 +227,6 @@ void cache_flush (void) {
     number_of_hits = 0;
     lock_release(&number_of_hits_lock);
 
-    /* block_write all blocks in cache to disk */
-    lock_acquire(&number_of_cache_accesses_lock);
-    number_of_cache_accesses = 0;
-    lock_release(&number_of_cache_accesses_lock);
-
-    lock_acquire(&number_of_hits_lock);
-    number_of_hits = 0;
-    lock_release(&number_of_hits_lock);
-
 
     /* TODO: block_write all blocks in cache to disk */
     lock_acquire(&cache_lock);

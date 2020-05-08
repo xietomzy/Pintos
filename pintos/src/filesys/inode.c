@@ -507,31 +507,30 @@ inode_close_dir_ptrs (struct inode *inode) {
 /* Closes the indirect pointer, and sets the inode's indirect_block pointer to 0. */
 void
 inode_close_indir_ptr (struct inode *inode) {
-  block_sector_t buffer[128];
-  struct inode_disk inode_disk;
-  cache_read(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
+  block_sector_t ind_blk_ptr;
+  off_t offset = sizeof(off_t) + NUM_DIRECT_SECTORS * sizeof(block_sector_t);
+  cache_read(fs_device, inode->data, &ind_blk_ptr, offset, sizeof(ind_blk_ptr));
 
-  if (inode_disk.ind_blk_ptr == 0) {
+  if (ind_blk_ptr == 0) {
     return;
   }
-  cache_read(fs_device, inode_disk.ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
-  for (int i = 0; i < 128; i ++) {
-    if (buffer[i] != 0) {
-      free_map_release(buffer[i], 1);
-    }
-  }
-  inode_disk.ind_blk_ptr = 0;
-  cache_write(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
+
+  close_indir_ptr (ind_blk_ptr);
+  ind_blk_ptr = 0;
+  cache_write(fs_device, inode->data, &ind_blk_ptr, 0, sizeof(ind_blk_ptr));
 }
 
 /* Frees up every single pointer within block, which we assume to be a pointer to an indirect pointer. */
 void 
 close_indir_ptr (block_sector_t block) {
-  block_sector_t buffer[128];
-  cache_read(fs_device, block, buffer, 0, BLOCK_SECTOR_SIZE);
+  block_sector_t blk_ptr;
   for (int i = 0; i < 128; i ++) {
-    if (buffer[i] != 0) {
-      free_map_release(buffer[i], 1);
+    off_t offset = i * sizeof(block_sector_t);
+    cache_read(fs_device, block, &blk_ptr, offset, sizeof(blk_ptr));
+    if (blk_ptr != 0) {
+      free_map_release(blk_ptr, 1);
+      blk_ptr = 0;
+      cache_read(fs_device, block, &blk_ptr, offset, sizeof(blk_ptr));
     }
   }
 }

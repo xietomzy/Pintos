@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "devices/ide.h"
 #include "threads/malloc.h"
+#include "filesys/filesys.h"
 
 /* A block device. */
 struct block
@@ -28,6 +29,16 @@ static struct list all_blocks = LIST_INITIALIZER (all_blocks);
 static struct block *block_by_role[BLOCK_ROLE_CNT];
 
 static struct block *list_elem_to_block (struct list_elem *);
+
+long long fs_num_reads (void) 
+{
+  return fs_device->read_cnt;
+}
+
+long long fs_num_writes (void) 
+{
+  return fs_device->write_cnt;
+}
 
 /* Returns a human-readable name for the given block device
    TYPE. */

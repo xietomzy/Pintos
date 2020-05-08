@@ -118,6 +118,12 @@ file_write_at (struct file *file, const void *buffer, off_t size,
 void
 file_deny_write (struct file *file) 
 {
+  /* Include a monitor to force 
+   * file_deny_write to wait for all active writers of the file to finish before returning
+   */
+
+  
+  
   ASSERT (file != NULL);
   if (!file->deny_write) 
     {

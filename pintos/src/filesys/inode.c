@@ -76,7 +76,7 @@ struct inode
 
     /* Our implementation of inode adds a few more synch tools. */
     struct lock dataCheckIn; // for read/write
-    struct lock open_cnt_lock;
+    struct lock metadata;
     struct condition waitQueue;
     struct condition onDeckQueue; // access queues for read/write
     int queued; // num queued threads
@@ -416,7 +416,7 @@ inode_open (block_sector_t sector)
   inode->removed = false;
 
   lock_init(&(inode->dataCheckIn));
-  lock_init(&(inode->open_cnt_lock));
+  lock_init(&(inode->metadata));
   cond_init(&(inode->waitQueue));
   cond_init(&(inode->onDeckQueue));
   list_push_front (&open_inodes, &(inode->elem));
@@ -430,9 +430,9 @@ struct inode *
 inode_reopen (struct inode *inode)
 {
   if (inode != NULL) {
-    lock_acquire(&(inode->open_cnt_lock));
+    lock_acquire(&(inode->metadata));
     inode->open_cnt++;
-    lock_release(&(inode->open_cnt_lock));
+    lock_release(&(inode->metadata));
   }
   return inode;
 }

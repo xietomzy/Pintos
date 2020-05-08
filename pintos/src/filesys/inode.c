@@ -90,7 +90,7 @@ struct inode
     struct lock metadata;
     struct lock resize;
 
-    /* Tools to allow concurrent reads and serialized writes. */
+    /* Tools to allow concurrent reads and serialized writes. Protected by dataCheckIn. */
     struct lock dataCheckIn; // for read/write
     struct condition waitQueue;
     struct condition onDeckQueue; // access queues for read/write
@@ -98,8 +98,9 @@ struct inode
     int onDeck; // sleeping threads for read/write
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s)
+    struct condition waitActiveWriters; // To force file_deny_write to wait for all writers to finish
 
-    uint32_t unused[90];
+    uint32_t unused[86];
 
     unsigned magic;                     /* Magic number. */
   };
@@ -142,6 +143,10 @@ checkout (struct inode *inode)
 {
   lock_acquire(&(inode->dataCheckIn));
   (inode->numRWing) --;
+  // Wake up anyone waiting for writers to finish
+  if (inode->numRWing == 0 && inode->curType == 1) {
+    cond_broadcast(&(inode->onDeckQueue), &(inode->dataCheckIn));
+  }
   cond_signal(&(inode->onDeckQueue), &(inode->dataCheckIn));
   lock_release(&(inode->dataCheckIn));
 }
@@ -416,7 +421,6 @@ inode_create (block_sector_t sector, off_t length)
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
-  // printf("\nSize of inode: %d\n", sizeof *node);
   ASSERT (sizeof *node == BLOCK_SECTOR_SIZE);
 
   node = calloc (1, sizeof *node);
@@ -482,6 +486,7 @@ inode_open (block_sector_t sector)
   lock_init(&(inode->resize));
   cond_init(&(inode->waitQueue));
   cond_init(&(inode->onDeckQueue));
+  cond_init(&(inode->waitActiveWriters));
 
   list_push_front (&open_inodes, &(inode->elem));
 
@@ -720,10 +725,15 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 void
 inode_deny_write (struct inode *inode)
 {
-  // TODO: Sleep until all writers finish if there are any
   lock_acquire(&(inode->metadata));
   inode->deny_write_cnt++;
   ASSERT (inode->deny_write_cnt <= inode->open_cnt);
+  // If there are any writers, sleep until there are none
+  lock_acquire(&(inode->dataCheckIn));
+  while (inode->numRWing > 0 && inode->curType == 1) {
+    cond_wait(&(inode->waitActiveWriters), &(inode->dataCheckIn));
+  }
+  lock_release(&(inode->dataCheckIn));
   lock_release(&(inode->metadata));
 }
 

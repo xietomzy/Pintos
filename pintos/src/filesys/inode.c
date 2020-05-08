@@ -718,9 +718,7 @@ inode_allow_write (struct inode *inode)
 off_t
 inode_length (const struct inode *inode)
 {
-  struct inode_disk *disk = malloc(BLOCK_SECTOR_SIZE);
-  cache_read(fs_device, inode->data, disk, 0, BLOCK_SECTOR_SIZE);
-  off_t length = disk->length;
-  free(disk);
+  off_t length;
+  cache_read(fs_device, inode->data, &length, 0, sizeof(off_t));
   return length;
 }

@@ -538,21 +538,26 @@ close_indir_ptr (block_sector_t block) {
 /* Closes the doubly indirect pointer. */
 void
 inode_close_double_indir_ptr (struct inode *inode) {
-  block_sector_t buffer[128];
-  struct inode_disk inode_disk;
-  cache_read(fs_device, inode->data, buffer, 0, BLOCK_SECTOR_SIZE);
-  if (inode_disk.double_ind_blk_ptr == 0) {
+  block_sector_t blk1_ptr;
+  off_t offset = sizeof(off_t) + (NUM_DIRECT_SECTORS + 1) * sizeof(block_sector_t);
+  cache_read(fs_device, inode->data, &blk1_ptr, offset, sizeof(blk1_ptr));
+  if (blk1_ptr == 0) {
     return;
   }
-  cache_read(fs_device, inode_disk.double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
+
+  block_sector_t blk2_ptr;
   for (int i = 0; i < 128; i ++) {
-    if (buffer[i] != 0) {
-      close_indir_ptr(buffer[i]);
-      free_map_release(buffer[i], 1);
+    offset = i * sizeof(block_sector_t);
+    cache_read(fs_device, blk1_ptr, &blk2_ptr, offset, sizeof(blk2_ptr));
+    if (blk2_ptr != 0) {
+      close_indir_ptr(blk2_ptr);
+      free_map_release(blk2_ptr, 1);
+      blk2_ptr = 0;
+      cache_write(fs_device, blk1_ptr, &blk2_ptr, offset, sizeof(blk2_ptr));
     }
   }
-  inode_disk.double_ind_blk_ptr = 0;
-  cache_write(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
+  blk1_ptr = 0;
+  cache_write(fs_device, inode->data, &blk1_ptr, offset, sizeof(blk1_ptr));
 }
 
 /* Closes INODE and writes it to disk.

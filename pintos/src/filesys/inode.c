@@ -603,7 +603,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
   access(inode, 1);
-  const off_t *buffer = buffer_;
+  const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
 
   if (inode->deny_write_cnt)

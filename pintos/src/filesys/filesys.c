@@ -15,6 +15,7 @@ struct block *fs_device;
 bool rel_or_abs(const char *name);
 static int get_next_part (char part[NAME_MAX + 1], const char **srcp);
 void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d);
+bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file, off_t initial_size);
 
 /* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the
 next call will return the next file name part. Returns 1 if successful, 0 at
@@ -79,17 +80,23 @@ filesys_done (void)
 bool
 filesys_create (const char *name, off_t initial_size) 
 {
-  block_sector_t inode_sector = 0;
-  struct dir *dir = dir_open_root ();
-  bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector)
-                  && inode_create (inode_sector, initial_size)
-                  && dir_add (dir, name, inode_sector));
-  if (!success && inode_sector != 0) 
-    free_map_release (inode_sector, 1);
-  dir_close (dir);
-
-  return success;
+  // block_sector_t inode_sector = 0;
+  // struct dir *dir = dir_open_root ();
+  // bool success = (dir != NULL
+  //                 && free_map_allocate (1, &inode_sector)
+  //                 && inode_create (inode_sector, initial_size)
+  //                 && dir_add (dir, name, inode_sector));
+  // if (!success && inode_sector != 0) {
+  //   free_map_release (inode_sector, 1);
+  // }
+  // dir_close (dir);
+  // return success;
+  bool result;
+  if (rel_or_abs(name) || thread_current()->cwd == NULL) {
+    return filesys_mkdir_helper(dir_open_root(), name, true, initial_size);
+  } else {
+    return filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, true, initial_size);
+  }  
 }
 
 /* 0 for relative, 1 for absolute*/
@@ -108,32 +115,28 @@ void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d
   char name_buffer[NAME_MAX + 1];
   struct inode *inode = NULL;
   bool success;
-  struct file *file;
+  struct file *file = NULL;
   char **srcp = &name; // name pointer for get_next_part
   while (get_next_part(name_buffer, srcp) == 1) {
     success = dir_lookup(dir, name_buffer, &inode); // check if directory/file exists in dir
     if (!success) { // if dir/file doesn't exist, return NULL
       return NULL;
     }
-
-    file = file_open(inode); // try to open file
-    if (file != NULL) { // if path has file, immediately return the file
-      if (thread_current()->cwd != NULL) {
-        thread_current()->cwd = dir; // set cwd
+    if (!inode_is_dir(inode)) {
+      file = file_open(inode); // try to open file
+      if (file != NULL) { // if path has file, immediately return the file
+        dir_close(dir);
+        *f_or_d = 0;
+        return (void *) file;
       }
+    } else {
       dir_close(dir);
-      *f_or_d = 0;
-      return (void *) file;
-    }
-    dir_close(dir);
-    dir = dir_open(inode); // try to open directory
-    if (dir != NULL) { // if we get a directory, continue looking into the directory
-      if (**srcp == '\0') { // if last thing in path is a directory, we return a directory
-        if (thread_current()->cwd != NULL) {
-          thread_current()->cwd = dir; // set cwd
+      dir = dir_open(inode); // try to open directory
+      if (dir != NULL) { // if we get a directory, continue looking into the directory
+        if (**srcp == '\0') { // if last thing in path is a directory, we return a directory
+          *f_or_d = 1;
+          return (void *) dir;
         }
-        *f_or_d = 1;
-        return (void *) dir;
       }
     }
   }
@@ -178,7 +181,7 @@ do_format (void)
 {
   printf ("Formatting file system...");
   free_map_create ();
-  if (!dir_create (ROOT_DIR_SECTOR, 16))
+  if (!dir_create (ROOT_DIR_SECTOR, 16, true))
     PANIC ("root directory creation failed");
   free_map_close ();
   printf ("done.\n");
@@ -189,8 +192,10 @@ bool filesys_chdir(const char *name) {
   struct dir *result;
   if (rel_or_abs(name)) { // if absolute
     result = (struct dir *) filesys_open_helper(dir_open_root(), name, &dummy);
+    thread_current()->cwd = result;
   } else { // if relative
     result = (struct dir *) filesys_open_helper(dir_reopen(thread_current()->cwd), name, &dummy);
+    thread_current()->cwd = result;
   }
 
   if (result != NULL) {
@@ -199,7 +204,7 @@ bool filesys_chdir(const char *name) {
   return false;
 }
 
-bool filesys_mkdir_helper(struct dir* directory, const char *name) {
+bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file, off_t initial_size, bool remove) {
   struct dir *dir = directory;
   if (dir == NULL) {
     return false;
@@ -209,39 +214,59 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name) {
   //bool success;
   char **srcp = &name; // name pointer for get_next_part
   struct dir *prev_dir;
+  //struct file *file;
   while (get_next_part(name_buffer, srcp) == 1) {
     dir_lookup(dir, name_buffer, &inode); // check if directory/file exists in dir
-    dir_close(dir);
     prev_dir = dir;
     dir = dir_open(inode); // try to open directory
     if (**srcp == '\0') { // if last thing in path is a directory, we return a directory
-      if (dir != NULL) {
+      if (is_file) { // creates file for filesys_create
+        block_sector_t inode_sector = 0;
+        bool success = (free_map_allocate (1, &inode_sector)
+                  && inode_create (inode_sector, initial_size, false)
+                  && dir_add (prev_dir, name_buffer, inode_sector));
+        if (!success && inode_sector != 0) {
+          free_map_release (inode_sector, 1);
+        }
+        dir_close(prev_dir);
+        return success;
+      }
+      if (remove) {
+        
+      }
+      if (dir != NULL) { // if directory already exists, return false
+        dir_close(dir);
+        dir_close(prev_dir);
         return false;
       }
       block_sector_t inode_sector = 0;
-      bool success = (dir != NULL
-                  && free_map_allocate (1, &inode_sector)
-                  && dir_create (inode_sector, 2)
+      bool success = (free_map_allocate (1, &inode_sector)
+                  && dir_create (inode_sector, 16, true)
                   && dir_add (prev_dir, name_buffer, inode_sector));
       if (!success && inode_sector != 0) {
         free_map_release (inode_sector, 1);
+        return false;
       }
-      dir_add (dir, "..", inode_get_inumber(dir_get_inode(prev_dir))); // add parent directory
-      dir_add (dir, ".", inode_sector); // add current directory
-      inode_sector = 0;
+      dir_lookup(prev_dir, name_buffer, &inode);
+      dir = dir_open(inode);
+      dir_add(dir, "..", inode_get_inumber(dir_get_inode(prev_dir))); // add parent directory
+      dir_add(dir, ".", inode_sector); // add current directory
+      dir_close(dir);
+      dir_close(prev_dir);
       return true;
     }
+    dir_close(prev_dir);
   }
   dir_close(dir);
   return false;
 }
 
 bool filesys_mkdir(const char *name) {
-  bool result = NULL;
+  bool result;
   if (rel_or_abs(name)) {
-    result = filesys_mkdir_helper(dir_open_root(), name);
+    result = filesys_mkdir_helper(dir_open_root(), name, false, 0);
   } else {
-    result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name);
+    result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, false, 0);
   }
 
   return result;

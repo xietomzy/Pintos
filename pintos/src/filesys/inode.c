@@ -18,6 +18,7 @@
 void checkout(struct inode *inode);
 void flush_indirect_block(block_sector_t indirect_block_ptr);
 bool inode_resize(struct inode *inode, off_t size);
+bool inode_is_dir (struct inode *inode); // return true if inode is dir
 
 
 /* List of open inodes, so that opening a single inode twice
@@ -79,10 +80,14 @@ struct inode
     int onDeck; // sleeping threads for read/write
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s) and their type
+    
+    struct lock dir_lock;               /* Lock only used if inode refers to a directory; size = 24 bytes*/
+    bool is_dir;                        /* 0 if not dir, 1 otw */
 
-    uint32_t unused[96];
+    uint8_t unused[96 * 4 - sizeof(struct lock) - sizeof(bool)];
 
     unsigned magic;                     /* Magic number. */
+
   };
 
 /* Called by access methods to this inode before actually
@@ -345,7 +350,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   struct inode *node = NULL;
   bool success = false;
@@ -362,6 +367,7 @@ inode_create (block_sector_t sector, off_t length)
       size_t sectors = bytes_to_sectors (length);
       node->magic = INODE_MAGIC;
       node->sector = sector;
+      node->is_dir = is_dir;
       bool data_status = free_map_allocate(1, &(node->data));
   
       if (!data_status) {
@@ -667,4 +673,9 @@ inode_length (const struct inode *inode)
   off_t length = disk->length;
   free(disk);
   return length;
+}
+
+bool
+inode_is_dir (struct inode *inode) {
+  return inode->is_dir;
 }

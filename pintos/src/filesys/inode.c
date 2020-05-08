@@ -88,6 +88,7 @@ struct inode
     /* Our implementation of inode adds a few more synch tools. */
     struct lock dataCheckIn; // for read/write
     struct lock metadata;
+    struct lock resize;
     struct condition waitQueue;
     struct condition onDeckQueue; // access queues for read/write
     int queued; // num queued threads
@@ -95,7 +96,7 @@ struct inode
     int curType; // 0 = reading, 1 = writing
     int numRWing; // current accessor(s)
 
-    uint32_t unused[96];
+    uint32_t unused[90];
 
     unsigned magic;                     /* Magic number. */
   };
@@ -433,6 +434,7 @@ inode_open (block_sector_t sector)
 
   lock_init(&(inode->dataCheckIn));
   lock_init(&(inode->metadata));
+  lock_init(&(inode->resize));
   cond_init(&(inode->waitQueue));
   cond_init(&(inode->onDeckQueue));
   list_push_front (&open_inodes, &(inode->elem));
@@ -578,7 +580,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   access(inode, 0);
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  //uint8_t *bounce = NULL;
 
   while (size > 0)
     {

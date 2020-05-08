@@ -202,10 +202,11 @@ dir_remove (struct dir *dir, const char *name)
   inode = inode_open (e.inode_sector);
   if (inode == NULL)
     goto done;
-
-  if (inode_is_dir(inode)) {
+ 
+  if (inode_is_dir(inode)) { // directory not empty
     struct dir_entry e;
-    if (inode_read_at (dir->inode, &e, sizeof e, dir->pos + sizeof(e) * 2) == sizeof e) { // directory not empty
+    inode_read_at (dir->inode, &e, sizeof e, dir->pos + sizeof(e) * 4);
+    if (e.in_use) { 
       return false;
     }
   }

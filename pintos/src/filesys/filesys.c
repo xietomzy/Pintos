@@ -237,7 +237,8 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file,
         return success;
       }
       if (remove) {
-        bool success = prev_dir != NULL && dir_remove (prev_dir, name);
+        dir_close(dir);
+        bool success = prev_dir != NULL && dir_remove (prev_dir, name_buffer);
         dir_close(prev_dir);
         return success;
       }

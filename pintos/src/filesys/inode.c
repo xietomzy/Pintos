@@ -414,6 +414,16 @@ inode_create (block_sector_t sector, off_t length)
   node = calloc (1, sizeof *node);
   if (node != NULL)
     {
+      /* Initialize. */
+      node->open_cnt = 1;
+      node->deny_write_cnt = 0;
+      node->removed = false;
+
+      lock_init(&(node->dataCheckIn));
+      lock_init(&(node->metadata));
+      lock_init(&(node->resize));
+      cond_init(&(node->waitQueue));
+      cond_init(&(node->onDeckQueue));
       node->magic = INODE_MAGIC;
       node->sector = sector;
       bool data_status = free_map_allocate(1, &(node->data));
@@ -422,11 +432,15 @@ inode_create (block_sector_t sector, off_t length)
         return false;
       }
 
+      access(node, 1);
+      lock_acquire(&(node->resize));
       if (inode_resize(node, length))
         {
           cache_write (fs_device, sector, node, 0, BLOCK_SECTOR_SIZE);
           success = true;
         }
+      lock_release(&(node->resize));
+      checkout(node);
       free (node);
     }
   return success;
@@ -464,16 +478,6 @@ inode_open (block_sector_t sector)
 
   cache_read (fs_device, sector, inode, 0, BLOCK_SECTOR_SIZE);
 
-  /* Initialize. */
-  inode->open_cnt = 1;
-  inode->deny_write_cnt = 0;
-  inode->removed = false;
-
-  lock_init(&(inode->dataCheckIn));
-  lock_init(&(inode->metadata));
-  lock_init(&(inode->resize));
-  cond_init(&(inode->waitQueue));
-  cond_init(&(inode->onDeckQueue));
   list_push_front (&open_inodes, &(inode->elem));
 
   lock_release(&open_inodes_lock);

@@ -570,6 +570,9 @@ inode_close (struct inode *inode)
   if (inode == NULL)
     return;
 
+  // Write this inode out to disk
+  cache_write(fs_device, inode->sector, inode, 0, sizeof(inode));
+
   /* Release resources if this was the last opener. */
   if (--inode->open_cnt == 0)
     {

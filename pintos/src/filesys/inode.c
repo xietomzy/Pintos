@@ -23,7 +23,6 @@ void inode_close_indir_ptr (struct inode *inode);
 void close_indir_ptr (block_sector_t block);
 void inode_close_double_indir_ptr (struct inode *inode);
 
-
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
 static struct list open_inodes;
@@ -82,7 +81,7 @@ struct inode
     int queued; // num queued threads
     int onDeck; // sleeping threads for read/write
     int curType; // 0 = reading, 1 = writing
-    int numRWing; // current accessor(s) and their type
+    int numRWing; // current accessor(s)
 
     uint32_t unused[96];
 
@@ -206,7 +205,7 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
   }
 }
 
-/* Helper function we took inspiration from last year's disc.
+/* Helper function adapted from last year's discussion.
  * It will resize the INODE to size SIZE bytes, and sets the length
  * member accordingly. Automatically calls cache_write, but
  * be sure to cache inode in the caller!
@@ -255,6 +254,7 @@ bool inode_resize(struct inode *inode, off_t size) {
   } else { // Read the contents into the buffer
     cache_read(fs_device, inode_disk->ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   }
+
   for (int i = 0; i < 128; i ++) {
     if (size <= (NUM_DIRECT_SECTORS + i) * BLOCK_SECTOR_SIZE && buffer[i] != 0) {
       free_map_release(buffer[i], 1);
@@ -269,6 +269,8 @@ bool inode_resize(struct inode *inode, off_t size) {
       }
     }
   }
+
+  /* Success case: doubly indirect blocks */
   int size_check_double = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE + (128 * BLOCK_SECTOR_SIZE);
   // Success case:
   if (inode_disk->double_ind_blk_ptr == 0 && size < size_check_double) {
@@ -292,6 +294,7 @@ bool inode_resize(struct inode *inode, off_t size) {
     cache_read(fs_device, inode_disk->double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
   }
 
+  // Iterate through pointers to pointer blocks
   for (int i = 0; i < 128; i ++) {
     if (size <= (NUM_DIRECT_SECTORS + 128 + i) * BLOCK_SECTOR_SIZE && buffer[i] != 0) {
       // Release every block within the indirect block
@@ -357,6 +360,7 @@ inode_create (block_sector_t sector, off_t length)
 
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
+  // printf("\nSize of inode: %d\n", sizeof *node);
   ASSERT (sizeof *node == BLOCK_SECTOR_SIZE);
 
   node = calloc (1, sizeof *node);
@@ -478,7 +482,7 @@ inode_close_indir_ptr (struct inode *inode) {
   cache_write(fs_device, inode->data, &inode_disk, 0, BLOCK_SECTOR_SIZE);
 }
 
-/* Frees up every single pointer within block, which we assume to be an indirect pointer. */
+/* Frees up every single pointer within block, which we assume to be a pointer to an indirect pointer. */
 void 
 close_indir_ptr (block_sector_t block) {
   block_sector_t buffer[128];
@@ -490,7 +494,7 @@ close_indir_ptr (block_sector_t block) {
   }
 }
 
-/* Closes the direct pointer. */
+/* Closes the doubly indirect pointer. */
 void
 inode_close_double_indir_ptr (struct inode *inode) {
   block_sector_t buffer[128];
@@ -596,8 +600,8 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
    less than SIZE if end of file is reached or an error occurs.
-   (Normally a write at end of file would extend the inode, but
-   growth is not yet implemented.) */
+   A write at the end of the file extends the inode.
+   */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
@@ -632,7 +636,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       offset += chunk_size;
       bytes_written += chunk_size;
     }
-  //free (bounce);
 
   checkout(inode);
   return bytes_written;

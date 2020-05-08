@@ -174,7 +174,7 @@ void cache_write (struct block *block, block_sector_t sector, const void *buffer
 }
 
 void cache_flush (void) {
-    /* TODO: block_write all blocks in cache to disk */
+    /* block_write all blocks in cache to disk */
     lock_acquire(&cache_lock);
     for (int i = 0; i < MAX_CACHE_BLOCKS; i++) {
         if (cache[i].dirty) {

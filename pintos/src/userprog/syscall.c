@@ -381,6 +381,9 @@ sys_read (int handle, void *udst_, unsigned size)
   /* Handle all other reads. */
   fd = lookup_fd (handle);
   //lock_acquire (&fs_lock);
+  if (fd != NULL && fd->f_or_d) {
+    return -1;
+  }
   while (size > 0) 
     {
       /* How much to read into this page? */
@@ -430,6 +433,9 @@ sys_write (int handle, void *usrc_, unsigned size)
   if (handle != STDOUT_FILENO)
     fd = lookup_fd (handle);
 
+  if (fd != NULL && fd->f_or_d) {
+    return -1;
+  }
   //lock_acquire (&fs_lock);
   while (size > 0) 
     {

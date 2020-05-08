@@ -22,6 +22,7 @@ void inode_close_dir_ptrs (struct inode *inode);
 void inode_close_indir_ptr (struct inode *inode);
 void close_indir_ptr (block_sector_t block);
 void inode_close_double_indir_ptr (struct inode *inode);
+bool inode_resize_no_check(struct inode *inode, off_t size);
 
 /* List of open inodes, so that opening a single inode twice
    returns the same `struct inode'. */
@@ -236,11 +237,8 @@ void flush_indirect_block(block_sector_t indirect_block_ptr) {
  * the period of time in which the current thread saw the need to
  * resize the inode and when the current thread acquired the resize lock.
  * Also frees the lock acquired by the initial inode. */
-bool inode_resize(struct inode *inode, off_t size) {
-  ASSERT (lock_held_by_current_thread(&(inode->resize)));
-  ASSERT (inode->curType == 1);
-
-  // Check if another thread already resized before we could start resizing
+bool inode_resize_no_check(struct inode *inode, off_t size) {
+    // Check if another thread already resized before we could start resizing
   if (inode_length (inode) >= size) {
     return true;
   }
@@ -385,6 +383,13 @@ bool inode_resize(struct inode *inode, off_t size) {
   return true;
 }
 
+bool inode_resize(struct inode *inode, off_t size) {
+  ASSERT (lock_held_by_current_thread(&(inode->resize)));
+  ASSERT (inode->curType == 1);
+
+  return inode_resize_no_check(inode, size);
+}
+
 /* Initializes the inode module. */
 void
 inode_init (void)
@@ -417,16 +422,6 @@ inode_create (block_sector_t sector, off_t length)
   node = calloc (1, sizeof *node);
   if (node != NULL)
     {
-      /* Initialize. */
-      node->open_cnt = 1;
-      node->deny_write_cnt = 0;
-      node->removed = false;
-
-      lock_init(&(node->dataCheckIn));
-      lock_init(&(node->metadata));
-      lock_init(&(node->resize));
-      cond_init(&(node->waitQueue));
-      cond_init(&(node->onDeckQueue));
       node->magic = INODE_MAGIC;
       node->sector = sector;
       bool data_status = free_map_allocate(1, &(node->data));
@@ -435,15 +430,12 @@ inode_create (block_sector_t sector, off_t length)
         return false;
       }
 
-      access(node, 1);
-      lock_acquire(&(node->resize));
-      if (inode_resize(node, length))
+
+      if (inode_resize_no_check(node, length))
         {
           cache_write (fs_device, sector, node, 0, BLOCK_SECTOR_SIZE);
           success = true;
         }
-      lock_release(&(node->resize));
-      checkout(node);
       free (node);
     }
   return success;
@@ -480,6 +472,16 @@ inode_open (block_sector_t sector)
   }
 
   cache_read (fs_device, sector, inode, 0, BLOCK_SECTOR_SIZE);
+  /* Initialize. */
+  inode->open_cnt = 1;
+  inode->deny_write_cnt = 0;
+  inode->removed = false;
+
+  lock_init(&(inode->dataCheckIn));
+  lock_init(&(inode->metadata));
+  lock_init(&(inode->resize));
+  cond_init(&(inode->waitQueue));
+  cond_init(&(inode->onDeckQueue));
 
   list_push_front (&open_inodes, &(inode->elem));
 
@@ -671,13 +673,12 @@ off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
                 off_t offset)
 {
-  access(inode, 1);
+  if (inode->deny_write_cnt)
+    return 0;
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
 
-  if (inode->deny_write_cnt)
-    return 0;
-
+  access(inode, 1);
   // Check for resize
   if (offset + size > inode_length (inode)) {
     lock_acquire (&(inode->resize));

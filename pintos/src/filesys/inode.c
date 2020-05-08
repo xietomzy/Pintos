@@ -77,18 +77,20 @@ zero_block (block_sector_t block) {
 /* In-memory inode. */
 struct inode
   {
-
+    /* Begin metadata protection */
     struct list_elem elem;              /* Element in inode list. */
     block_sector_t sector;              /* Sector number of disk location. */
     block_sector_t data;                /* Pointer to the inode disk. */
     int open_cnt;                       /* Number of openers. */
     bool removed;                       /* True if deleted, false otherwise. */
     int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+    /* End metadata protection. */
 
-    /* Our implementation of inode adds a few more synch tools. */
-    struct lock dataCheckIn; // for read/write
     struct lock metadata;
     struct lock resize;
+
+    /* Tools to allow concurrent reads and serialized writes. */
+    struct lock dataCheckIn; // for read/write
     struct condition waitQueue;
     struct condition onDeckQueue; // access queues for read/write
     int queued; // num queued threads

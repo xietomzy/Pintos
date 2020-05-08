@@ -154,52 +154,56 @@ byte_to_sector (const struct inode *inode, off_t pos)
   int indirect_bytes = NUM_DIRECT_SECTORS * BLOCK_SECTOR_SIZE +
                              128 * BLOCK_SECTOR_SIZE;
 
-  int return_val = -1;
+  block_sector_t return_val;
 
   ASSERT (inode != NULL);
+  ASSERT (pos >= 0);
 
-  struct inode_disk *data = malloc(BLOCK_SECTOR_SIZE);
-  if (data == NULL) {
-    PANIC("Failure to load inode_disk");
-  }
-  cache_read(fs_device, inode->data, data, 0, BLOCK_SECTOR_SIZE);
+  off_t length;
+  cache_read(fs_device, inode->data, &length, 0, sizeof(off_t));
 
-  /* If the offset is less than the length of the file, then we attempt to find the
-   * proper sector */
-  if (pos < data->length) {
-    if (pos < direct_bytes) { // direct pointers
-      return_val = (data->direct_sector_ptrs)[pos / BLOCK_SECTOR_SIZE];
-      goto cleanup;
-    } else if (pos < indirect_bytes) { // indirect pointer
-      block_sector_t (*buffer)[128] = malloc(128 * sizeof (block_sector_t));
-      if (data->ind_blk_ptr == 0) {
-        PANIC("No indirect block allocated");
-      }
-      cache_read(fs_device, data->ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
-      // struct indirect_block *ind_blk = inode->data.ind_blk_ptr;
-      int blk_index = (pos - direct_bytes) / BLOCK_SECTOR_SIZE;
-      return_val = (*buffer)[blk_index];
-      free(buffer);
-      goto cleanup;
-    } else { // doubly indirect
-      block_sector_t (*buffer)[128] = malloc(128 * sizeof (block_sector_t));
-      if (data->double_ind_blk_ptr == 0) {
-        PANIC("No doubly direct block allocated");
-      }
-      cache_read(fs_device, data->double_ind_blk_ptr, buffer, 0, BLOCK_SECTOR_SIZE);
-      int ind_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE);
-      block_sector_t (*ind_buffer)[128] = malloc(128 * sizeof(block_sector_t));
-      cache_read(fs_device, *ind_buffer[ind_blk_index], ind_buffer, 0, BLOCK_SECTOR_SIZE);
-      int blk_index = (pos - direct_bytes - indirect_bytes) / BLOCK_SECTOR_SIZE;
-      return_val = *ind_buffer[blk_index];
-      free(ind_buffer);
-      free(buffer);
-      goto cleanup;
-    }
+  // If the offset is not within the file, return -1
+  if (pos >= length) {
+    return -1;
   }
-  cleanup:
-    free(data);
+  // Direct pointers
+  if (pos < direct_bytes) {
+    off_t block_pos = sizeof(off_t) + pos/BLOCK_SECTOR_SIZE * sizeof(block_sector_t);
+    cache_read(fs_device, inode->data, &return_val, block_pos, sizeof(block_sector_t));
     return return_val;
+  }
+  // Indirect pointers
+  if (pos < indirect_bytes) { // indirect pointer
+    off_t ind_blk_pos = sizeof(off_t) + NUM_DIRECT_SECTORS * sizeof(block_sector_t);
+    block_sector_t ind_blk_ptr;
+    cache_read(fs_device, inode->data, &ind_blk_ptr, ind_blk_pos, sizeof(block_sector_t));
+    if (ind_blk_ptr == 0) {
+      PANIC("File claims to have indirect block, but it is not initialized");
+    }
+
+    off_t blk_index = (pos - direct_bytes) / BLOCK_SECTOR_SIZE * sizeof(block_sector_t);
+    cache_read(fs_device, ind_blk_ptr, &return_val, blk_index, sizeof(block_sector_t));
+    return return_val;
+  }
+  // doubly indirect
+  off_t dbl_ind_blk_pos = sizeof(off_t) + (NUM_DIRECT_SECTORS + 1) * sizeof(block_sector_t);
+  block_sector_t dbl_ind_blk_ptr;
+  cache_read(fs_device, inode->data, &dbl_ind_blk_ptr, dbl_ind_blk_pos, sizeof(block_sector_t));
+  if (dbl_ind_blk_ptr == 0) {
+    PANIC("File claims to have doubly indirect block, but it is not initialized");
+  }
+
+  off_t next_blk_index = (pos - direct_bytes - indirect_bytes) / (128 * BLOCK_SECTOR_SIZE) * sizeof(block_sector_t);
+  block_sector_t next_blk_ptr;
+  cache_read(fs_device, dbl_ind_blk_ptr, &next_blk_ptr, next_blk_index, sizeof(block_sector_t));
+  if (next_blk_ptr == 0) {
+    return -1;
+  }
+
+  off_t skipped_dbl_bytes = (next_blk_index * 128 * BLOCK_SECTOR_SIZE);
+  off_t blk_index = (pos - direct_bytes - indirect_bytes - skipped_dbl_bytes) / BLOCK_SECTOR_SIZE * sizeof(block_sector_t);
+  cache_read(fs_device, next_blk_ptr, &return_val, blk_index, sizeof(block_sector_t));
+  return return_val;
 }
 
 /* Helper function for inode_resize. Assumes that INDIRECT_BLOCK_PTR

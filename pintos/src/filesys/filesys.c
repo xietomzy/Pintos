@@ -16,7 +16,7 @@ struct block *fs_device;
 bool rel_or_abs(const char *name);
 static int get_next_part (char part[NAME_MAX + 1], const char **srcp);
 void * filesys_open_helper(struct dir *directory, const char *name, bool *f_or_d);
-bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file, off_t initial_size);
+bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file, off_t initial_size, bool remove);
 
 /* Extracts a file name part from *SRCP into PART, and updates *SRCP so that the
 next call will return the next file name part. Returns 1 if successful, 0 at
@@ -94,9 +94,9 @@ filesys_create (const char *name, off_t initial_size)
   // return success;
   bool result;
   if (rel_or_abs(name) || thread_current()->cwd == NULL) {
-    return filesys_mkdir_helper(dir_open_root(), name, true, initial_size);
+    return filesys_mkdir_helper(dir_open_root(), name, true, initial_size, false);
   } else {
-    return filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, true, initial_size);
+    return filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, true, initial_size, false);
   }  
 }
 
@@ -170,10 +170,15 @@ filesys_open (const char *name, bool *f_or_d)
 bool
 filesys_remove (const char *name) 
 {
-  struct dir *dir = dir_open_root ();
-  bool success = dir != NULL && dir_remove (dir, name);
-  dir_close (dir); 
-  return success;
+  // struct dir *dir = dir_open_root ();
+  // bool success = dir != NULL && dir_remove (dir, name);
+  // dir_close (dir); 
+  // return success;
+  if (rel_or_abs(name) || thread_current()->cwd == NULL) {
+    return filesys_mkdir_helper(dir_open_root(), name, false, 0, true);
+  } else {
+    return filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, false, 0, true);
+  }
 }
 
 /* Formats the file system. */
@@ -233,7 +238,9 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file,
         return success;
       }
       if (remove) {
-        
+        bool success = prev_dir != NULL && dir_remove (prev_dir, name);
+        dir_close(prev_dir);
+        return success;
       }
       if (dir != NULL) { // if directory already exists, return false
         dir_close(dir);
@@ -265,9 +272,9 @@ bool filesys_mkdir_helper(struct dir* directory, const char *name, bool is_file,
 bool filesys_mkdir(const char *name) {
   bool result;
   if (rel_or_abs(name)) {
-    result = filesys_mkdir_helper(dir_open_root(), name, false, 0);
+    result = filesys_mkdir_helper(dir_open_root(), name, false, 0, false);
   } else {
-    result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, false, 0);
+    result = filesys_mkdir_helper(dir_reopen(thread_current()->cwd), name, false, 0, false);
   }
 
   return result;

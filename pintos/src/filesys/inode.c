@@ -62,6 +62,18 @@ bytes_to_sectors (off_t size)
   return DIV_ROUND_UP (size, BLOCK_SECTOR_SIZE);
 }
 
+static void
+zero_block (block_sector_t block) {
+  off_t divisions = 8;
+  ASSERT (BLOCK_SECTOR_SIZE % (sizeof(block_sector_t) * divisions) == 0);
+  size_t buf_len = BLOCK_SECTOR_SIZE / (sizeof(block_sector_t) * divisions);
+  block_sector_t zero_buf[buf_len];
+  memset(zero_buf, 0, BLOCK_SECTOR_SIZE / divisions);
+  for (int i = 0; i < divisions; i++) {
+    cache_write(fs_device, block, &zero_buf, i * buf_len * sizeof(block_sector_t), buf_len * sizeof(block_sector_t));
+  }
+}
+
 /* In-memory inode. */
 struct inode
   {

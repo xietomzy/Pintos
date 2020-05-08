@@ -126,6 +126,9 @@ access (struct inode *inode, int type)
     (inode->onDeck)--;
   }
 
+  inode->curType = type;
+  inode->numRWing++;
+  cond_signal(&(inode->waitQueue), &(inode->dataCheckIn));
   // Complete check-in
   lock_release(&(inode->dataCheckIn));
 }
